@@ -3,14 +3,16 @@ from flask_mysqldb import MySQL
 import hashlib
 import random
 from datetime import date
+import os
 
 app = Flask(__name__)
 app.secret_key = 'mindsprouts_secret_2024'
 
-app.config['MYSQL_HOST']        = 'localhost'
-app.config['MYSQL_USER']        = 'root'
-app.config['MYSQL_PASSWORD']    = 'Tanishq2006'
-app.config['MYSQL_DB']          = 'mindsprouts_db'
+app.config['MYSQL_HOST']        = os.environ.get('MYSQLHOST', 'localhost')
+app.config['MYSQL_USER']        = os.environ.get('MYSQLUSER', 'root')
+app.config['MYSQL_PASSWORD']    = os.environ.get('MYSQLPASSWORD', 'Tanishq2006')
+app.config['MYSQL_DB']          = os.environ.get('MYSQLDATABASE', 'mindsprouts_db')
+app.config['MYSQL_PORT']        = int(os.environ.get('MYSQLPORT', 3306))
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 
 mysql = MySQL(app)
