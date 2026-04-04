@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block title %}My History - MindSprouts{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="container">
+        <h1><i class="fa-solid fa-clock-rotate-left"></i> My Quiz History</h1>
+        <p class="mb-0 opacity-75">All your past quiz attempts</p>
+    </div>
+</div>
+
+<div class="container" style="max-width:780px">
+    {% if results %}
+        {% for r in results %}
+        {% set pct = (r.score / r.total_questions * 100)|int %}
+        <div class="leaderboard-row fade-in" style="animation-delay:{{ loop.index0 * 0.05 }}s">
+            <div class="rank-badge {{ 'rank-1' if pct >= 80 else 'rank-2' if pct >= 50 else 'rank-3' }}">
+                {% if pct >= 80 %}
+                    <i class="fa-solid fa-star"></i>
+                {% elif pct >= 50 %}
+                    <i class="fa-solid fa-circle-half-stroke"></i>
+                {% else %}
+                    <i class="fa-solid fa-rotate"></i>
+                {% endif %}
+            </div>
+            <div class="flex-grow-1">
+                <div style="font-family:'Baloo 2',sans-serif;font-weight:700">
+                    {{ r.topic_name }}
+                </div>
+                <div class="small text-muted">
+                    {{ r.subject_name }} · {{ r.attempted_at.strftime('%d %b %Y, %I:%M %p') }}
+                </div>
+            </div>
+            <div class="text-end">
+                <div style="font-family:'Baloo 2',sans-serif;font-weight:800;font-size:1.1rem">
+                    {{ r.score }}/{{ r.total_questions }}
+                </div>
+                <div class="small" style="color:{{ '#16a34a' if pct >= 80 else '#f59e0b' if pct >= 50 else '#ef4444' }}">
+                    {{ pct }}%
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="text-center py-5">
+            <i class="fa-solid fa-clipboard-list fa-3x text-muted mb-3"></i>
+            <h4>No quizzes yet!</h4>
+            <p class="text-muted">Take your first quiz to see your history here.</p>
+            <a href="{{ url_for('student_dashboard') }}" class="btn-primary-ms">
+                Start Quizzing!
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,237 @@
+{% extends 'base.html' %}
+{% block title %}MindSprouts - Login{% endblock %}
+
+{% block content %}
+<div class="login-page">
+    <div class="container">
+        <div class="row justify-content-center align-items-center min-vh-100">
+            <div class="col-lg-5 col-md-7">
+
+                <!-- Logo -->
+                <div class="text-center mb-4 fade-in">
+                    <div class="login-logo">
+                        <i class="fa-solid fa-seedling"></i>
+                    </div>
+                    <h1 class="login-title">MindSprouts</h1>
+                    <p class="login-subtitle">Learn. Play. Grow!</p>
+                </div>
+
+                <!-- Tab Switcher -->
+                <div class="login-card pop-in">
+                    <div class="tab-switcher">
+                        <button class="tab-btn active" onclick="switchTab('student')">
+                            <i class="fa-solid fa-user-graduate"></i> Student
+                        </button>
+                        <button class="tab-btn" onclick="switchTab('admin')">
+                            <i class="fa-solid fa-user-shield"></i> Admin
+                        </button>
+                    </div>
+
+                    <!-- Student Panel -->
+                    <div id="student-panel">
+                        <!-- Login / Signup toggle -->
+                        <div class="form-toggle">
+                            <button class="toggle-btn active" onclick="switchForm('login')">Login</button>
+                            <button class="toggle-btn" onclick="switchForm('signup')">Sign Up</button>
+                        </div>
+
+                        <!-- Student Login -->
+                        <div id="login-form">
+                            <form action="{{ url_for('student_login') }}" method="POST">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Username</label>
+                                    <div class="input-group-ms">
+                                        <i class="fa-solid fa-user"></i>
+                                        <input type="text" name="username" class="ms-input"
+                                               placeholder="Enter your username" required>
+                                    </div>
+                                </div>
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold">Password</label>
+                                    <div class="input-group-ms">
+                                        <i class="fa-solid fa-lock"></i>
+                                        <input type="password" name="password" class="ms-input"
+                                               placeholder="Enter your password" required>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn-primary-ms w-100">
+                                    <i class="fa-solid fa-rocket"></i> Let's Go!
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Student Signup -->
+                        <div id="signup-form" style="display:none">
+                            <form action="{{ url_for('signup') }}" method="POST">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Your Name</label>
+                                    <div class="input-group-ms">
+                                        <i class="fa-solid fa-face-smile"></i>
+                                        <input type="text" name="display_name" class="ms-input"
+                                               placeholder="What's your name?" required>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Username</label>
+                                    <div class="input-group-ms">
+                                        <i class="fa-solid fa-user"></i>
+                                        <input type="text" name="username" class="ms-input"
+                                               placeholder="Choose a username" required>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Password</label>
+                                    <div class="input-group-ms">
+                                        <i class="fa-solid fa-lock"></i>
+                                        <input type="password" name="password" class="ms-input"
+                                               placeholder="Create a password" required>
+                                    </div>
+                                </div>
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold">Your Grade</label>
+                                    <div class="input-group-ms">
+                                        <i class="fa-solid fa-graduation-cap"></i>
+                                        <select name="grade" class="ms-input" required>
+                                            <option value="">Select your grade</option>
+                                            <option value="1">Grade 1</option>
+                                            <option value="2">Grade 2</option>
+                                            <option value="3">Grade 3</option>
+                                            <option value="4">Grade 4</option>
+                                            <option value="5">Grade 5</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn-primary-ms w-100">
+                                    <i class="fa-solid fa-star"></i> Create Account!
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Admin Panel -->
+                    <div id="admin-panel" style="display:none">
+                        <form action="{{ url_for('admin_login') }}" method="POST">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Admin Username</label>
+                                <div class="input-group-ms">
+                                    <i class="fa-solid fa-user-shield"></i>
+                                    <input type="text" name="username" class="ms-input"
+                                           placeholder="Admin username" required>
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">Password</label>
+                                <div class="input-group-ms">
+                                    <i class="fa-solid fa-lock"></i>
+                                    <input type="password" name="password" class="ms-input"
+                                           placeholder="Admin password" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-primary-ms w-100">
+                                <i class="fa-solid fa-shield-halved"></i> Admin Login
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.login-page {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+}
+.login-logo {
+    width: 80px; height: 80px;
+    background: white;
+    border-radius: 24px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.2rem; color: #6366f1;
+    margin: 0 auto 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+}
+.login-title {
+    color: white; font-size: 2.4rem;
+    font-weight: 800; margin-bottom: 4px;
+}
+.login-subtitle { color: rgba(255,255,255,0.85); font-size: 1.1rem; }
+.login-card {
+    background: white;
+    border-radius: 24px;
+    padding: 32px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+.tab-switcher {
+    display: flex; gap: 8px;
+    background: #f1f5f9;
+    border-radius: 14px; padding: 6px;
+    margin-bottom: 24px;
+}
+.tab-btn {
+    flex: 1; border: none; background: transparent;
+    border-radius: 10px; padding: 10px;
+    font-family: 'Baloo 2', sans-serif;
+    font-weight: 700; font-size: 0.95rem;
+    color: #64748b; cursor: pointer; transition: all 0.2s;
+}
+.tab-btn.active {
+    background: white; color: #6366f1;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.form-toggle {
+    display: flex; gap: 0;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px; overflow: hidden;
+    margin-bottom: 24px;
+}
+.toggle-btn {
+    flex: 1; border: none; background: transparent;
+    padding: 10px; font-family: 'Nunito', sans-serif;
+    font-weight: 700; color: #94a3b8; cursor: pointer; transition: all 0.2s;
+}
+.toggle-btn.active { background: #6366f1; color: white; }
+.input-group-ms {
+    display: flex; align-items: center;
+    background: #f8faff; border: 2px solid #e2e8f0;
+    border-radius: 12px; padding: 0 16px;
+    transition: border-color 0.2s;
+}
+.input-group-ms:focus-within { border-color: #6366f1; }
+.input-group-ms i { color: #94a3b8; margin-right: 10px; font-size: 0.9rem; }
+.ms-input {
+    flex: 1; border: none; background: transparent;
+    padding: 12px 0; font-family: 'Nunito', sans-serif;
+    font-size: 0.95rem; outline: none; color: #374151;
+}
+.ms-input::placeholder { color: #cbd5e1; }
+@media (max-width: 576px) {
+    .login-card { padding: 24px 18px; margin: 0 8px; }
+    .login-title { font-size: 2rem; }
+    .btn-primary-ms { padding: 13px 20px; font-size: 1rem; }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function switchTab(tab) {
+    document.getElementById('student-panel').style.display = tab === 'student' ? 'block' : 'none';
+    document.getElementById('admin-panel').style.display   = tab === 'admin'   ? 'block' : 'none';
+    document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', (i === 0 && tab === 'student') || (i === 1 && tab === 'admin'));
+    });
+}
+function switchForm(form) {
+    document.getElementById('login-form').style.display  = form === 'login'  ? 'block' : 'none';
+    document.getElementById('signup-form').style.display = form === 'signup' ? 'block' : 'none';
+    document.querySelectorAll('.toggle-btn').forEach((b, i) => {
+        b.classList.toggle('active', (i === 0 && form === 'login') || (i === 1 && form === 'signup'));
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MindSprouts{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700;800&family=Nunito:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+{% if session.student_id or session.admin_id %}
+<nav class="navbar navbar-expand-lg">
+    <div class="container">
+        <a class="navbar-brand" href="{% if session.student_id %}{{ url_for('student_dashboard') }}{% else %}{{ url_for('admin_dashboard') }}{% endif %}">
+            <i class="fa-solid fa-seedling"></i> MindSprouts
+        </a>
+
+        <!-- Mobile badges -->
+        <div class="d-flex d-lg-none align-items-center gap-2 ms-auto me-2">
+            {% if session.student_id %}
+            <span class="points-badge-sm">
+                <i class="fa-solid fa-star"></i> {{ session.total_points }}
+            </span>
+            {% if session.current_streak > 0 %}
+            <span class="streak-badge-sm">
+                <i class="fa-solid fa-fire"></i> {{ session.current_streak }}
+            </span>
+            {% endif %}
+            {% endif %}
+        </div>
+
+        <button class="navbar-toggler" type="button"
+                data-bs-toggle="collapse" data-bs-target="#navMenu"
+                aria-controls="navMenu" aria-expanded="false">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navMenu">
+            <ul class="navbar-nav ms-auto align-items-lg-center gap-1">
+
+                {% if session.student_id %}
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'student_dashboard' %}nav-active{% endif %}"
+                       href="{{ url_for('student_dashboard') }}">
+                        <i class="fa-solid fa-house"></i>
+                        <span>Home</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'progress' %}nav-active{% endif %}"
+                       href="{{ url_for('progress') }}">
+                        <i class="fa-solid fa-chart-line"></i>
+                        <span>Progress</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'history' %}nav-active{% endif %}"
+                       href="{{ url_for('history') }}">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        <span>History</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'leaderboard' %}nav-active{% endif %}"
+                       href="{{ url_for('leaderboard') }}">
+                        <i class="fa-solid fa-trophy"></i>
+                        <span>Leaderboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'profile' %}nav-active{% endif %}"
+                       href="{{ url_for('profile') }}">
+                        <i class="fa-solid fa-user"></i>
+                        <span>Profile</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link timer-link"
+                       href="{{ url_for('toggle_timer') }}">
+                        <i class="fa-solid fa-stopwatch"
+                           style="color:{{ '#22c55e' if session.timer_enabled else '#94a3b8' }}"></i>
+                        <span>Timer {{ 'ON' if session.timer_enabled else 'OFF' }}</span>
+                    </a>
+                </li>
+                <li class="nav-item d-none d-lg-block">
+                    <span class="points-badge">
+                        <i class="fa-solid fa-star"></i> {{ session.total_points }} pts
+                    </span>
+                </li>
+                {% if session.current_streak > 0 %}
+                <li class="nav-item d-none d-lg-block">
+                    <span class="streak-badge">
+                        <i class="fa-solid fa-fire"></i> {{ session.current_streak }}
+                    </span>
+                </li>
+                {% endif %}
+                {% endif %}
+
+                {% if session.admin_id %}
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'admin_dashboard' %}nav-active{% endif %}"
+                       href="{{ url_for('admin_dashboard') }}">
+                        <i class="fa-solid fa-gauge"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'manage_questions' %}nav-active{% endif %}"
+                       href="{{ url_for('manage_questions') }}">
+                        <i class="fa-solid fa-circle-question"></i>
+                        <span>Questions</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'manage_students' %}nav-active{% endif %}"
+                       href="{{ url_for('manage_students') }}">
+                        <i class="fa-solid fa-users"></i>
+                        <span>Students</span>
+                    </a>
+                </li>
+                {% if session.is_super_admin %}
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'manage_admins' %}nav-active{% endif %}"
+                       href="{{ url_for('manage_admins') }}">
+                        <i class="fa-solid fa-user-shield"></i>
+                        <span>Admins</span>
+                    </a>
+                </li>
+                {% endif %}
+                <li class="nav-item d-none d-lg-block">
+                    <span class="admin-badge">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        {% if session.is_super_admin %}Super Admin{% else %}Admin{% endif %}
+                    </span>
+                </li>
+                {% endif %}
+
+                <li class="nav-item">
+                    <a class="nav-link logout-btn" href="{{ url_for('logout') }}">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span>Logout</span>
+                    </a>
+                </li>
+
+            </ul>
+        </div>
+    </div>
+</nav>
+{% endif %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="container mt-3">
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+{% endwith %}
+
+<main>{% block content %}{% endblock %}</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/script.js') }}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

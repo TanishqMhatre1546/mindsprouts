@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% block title %}Manage Students{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="container">
+        <a href="{{ url_for('admin_dashboard') }}" class="btn-back-header">
+            <i class="fa-solid fa-arrow-left"></i> Back
+        </a>
+        <h1><i class="fa-solid fa-users"></i> Manage Students</h1>
+        <p class="mb-0 opacity-75">{{ students|length }} students registered</p>
+    </div>
+</div>
+
+<div class="container">
+    <div style="background:white;border-radius:20px;
+                box-shadow:0 4px 16px rgba(0,0,0,0.06);overflow:hidden">
+        <div style="overflow-x:auto">
+            <table class="table table-hover mb-0" style="min-width:650px">
+                <thead style="background:#f8faff">
+                    <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Username</th>
+                        <th>Grade</th>
+                        <th>Points</th>
+                        <th>Joined</th>
+                        <th>Activity</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in students %}
+                    <tr>
+                        <td class="text-muted small">{{ loop.index }}</td>
+                        <td>
+                            <div style="display:flex;align-items:center;gap:10px">
+                                <div style="width:34px;height:34px;border-radius:10px;
+                                     background:#eef2ff;color:#6366f1;display:flex;
+                                     align-items:center;justify-content:center;
+                                     font-weight:800;font-size:0.85rem;flex-shrink:0">
+                                    {{ s.display_name[0].upper() }}
+                                </div>
+                                <strong>{{ s.display_name }}</strong>
+                            </div>
+                        </td>
+                        <td class="text-muted">{{ s.username }}</td>
+                        <td>
+                            <span class="badge"
+                                  style="background:#eef2ff;color:#6366f1">
+                                Grade {{ s.grade }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="points-badge" style="font-size:0.8rem;padding:4px 10px">
+                                <i class="fa-solid fa-star"></i> {{ s.total_points }}
+                            </span>
+                        </td>
+                        <td class="text-muted small">
+                            {{ s.created_at.strftime('%d %b %Y') }}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('student_activity', student_id=s.student_id) }}"
+                               class="btn btn-sm"
+                               style="background:#eef2ff;color:#6366f1;
+                                      border:none;font-weight:600;white-space:nowrap">
+                                <i class="fa-solid fa-chart-line"></i> View
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            No students registered yet.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

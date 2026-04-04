@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard - MindSprouts{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="container">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+            <div>
+                <h1><i class="fa-solid fa-house"></i> Hello, {{ session.display_name }}!</h1>
+                <p class="mb-0 opacity-75">Grade {{ session.grade }} — Pick a subject to start!</p>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <div class="header-stat-pill">
+                    <i class="fa-solid fa-star"></i> {{ session.total_points }} pts
+                </div>
+                {% if session.current_streak > 0 %}
+                <div class="header-stat-pill" style="background:rgba(234,88,12,0.2);border-color:rgba(234,88,12,0.4)">
+                    <i class="fa-solid fa-fire" style="color:#fdba74"></i>
+                    <span>{{ session.current_streak }} day streak</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- Streak Banner (if streak > 0) -->
+    {% if session.current_streak >= 3 %}
+    <div class="streak-banner mb-4 fade-in">
+        <i class="fa-solid fa-fire fa-lg"></i>
+        <div>
+            <div style="font-weight:700">
+                {% if session.current_streak >= 7 %}
+                    Amazing! {{ session.current_streak }} day streak!
+                {% elif session.current_streak >= 5 %}
+                    On fire! {{ session.current_streak }} days in a row!
+                {% else %}
+                    Great habit! {{ session.current_streak }} day streak!
+                {% endif %}
+            </div>
+            <div class="small opacity-75">Keep quizzing daily to maintain your streak!</div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Subject Cards -->
+    <h5 class="section-title">Choose a Subject</h5>
+    <div class="row g-4 mb-5">
+        {% for subject in subjects %}
+        <div class="col-6 col-md-3 fade-in"
+             style="animation-delay:{{ loop.index0 * 0.1 }}s">
+            <a href="{{ url_for('topics', subject_id=subject.subject_id) }}"
+               class="subject-card {{ subject.color_class }}">
+                <div class="card-body">
+                    <div class="subject-icon-box">
+                        <i class="fa-solid {{ subject.icon }}"></i>
+                    </div>
+                    <h5>{{ subject.subject_name }}</h5>
+                    <p class="mb-0 small opacity-75">Grade {{ session.grade }} topics</p>
+                </div>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Quick Stats Row -->
+    <h5 class="section-title">Quick Stats</h5>
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <a href="{{ url_for('history') }}" class="stat-card text-decoration-none">
+                <div class="stat-icon" style="background:#eef2ff">
+                    <i class="fa-solid fa-clipboard-list" style="color:#6366f1"></i>
+                </div>
+                <div>
+                    <div class="stat-number">{{ total_quizzes }}</div>
+                    <div class="small text-muted">Quizzes</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a href="{{ url_for('progress') }}" class="stat-card text-decoration-none">
+                <div class="stat-icon" style="background:#dcfce7">
+                    <i class="fa-solid fa-chart-line" style="color:#16a34a"></i>
+                </div>
+                <div>
+                    <div class="stat-number">{{ session.total_points }}</div>
+                    <div class="small text-muted">Points</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a href="{{ url_for('leaderboard') }}" class="stat-card text-decoration-none">
+                <div class="stat-icon" style="background:#fef9c3">
+                    <i class="fa-solid fa-trophy" style="color:#eab308"></i>
+                </div>
+                <div>
+                    <div class="stat-number">Top 10</div>
+                    <div class="small text-muted">Leaderboard</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a href="{{ url_for('profile') }}" class="stat-card text-decoration-none">
+                <div class="stat-icon" style="background:#fff7ed">
+                    <i class="fa-solid fa-fire" style="color:#ea580c"></i>
+                </div>
+                <div>
+                    <div class="stat-number" style="color:#ea580c">
+                        {{ session.current_streak }}
+                    </div>
+                    <div class="small text-muted">Day Streak</div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

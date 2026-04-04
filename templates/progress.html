@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% block title %}My Progress - MindSprouts{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="container">
+        <h1><i class="fa-solid fa-chart-line"></i> My Progress</h1>
+        <p class="mb-0 opacity-75">Track your learning journey</p>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- Streak + Stats Row -->
+    <div class="row g-4 mb-5">
+        <div class="col-md-4">
+            <div class="stat-card" style="background:linear-gradient(135deg,#fff7ed,#ffedd5)">
+                <div class="stat-icon" style="background:#fed7aa">
+                    <i class="fa-solid fa-fire" style="color:#ea580c"></i>
+                </div>
+                <div>
+                    <div style="font-family:'Baloo 2',sans-serif;font-size:2rem;font-weight:800;color:#ea580c;line-height:1">
+                        {{ stats.current_streak }}
+                    </div>
+                    <div class="small text-muted">Day Streak</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card" style="background:linear-gradient(135deg,#fefce8,#fef9c3)">
+                <div class="stat-icon" style="background:#fde68a">
+                    <i class="fa-solid fa-trophy" style="color:#ca8a04"></i>
+                </div>
+                <div>
+                    <div style="font-family:'Baloo 2',sans-serif;font-size:2rem;font-weight:800;color:#ca8a04;line-height:1">
+                        {{ stats.longest_streak }}
+                    </div>
+                    <div class="small text-muted">Best Streak</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card" style="background:linear-gradient(135deg,#eef2ff,#e0e7ff)">
+                <div class="stat-icon" style="background:#c7d2fe">
+                    <i class="fa-solid fa-star" style="color:#4f46e5"></i>
+                </div>
+                <div>
+                    <div style="font-family:'Baloo 2',sans-serif;font-size:2rem;font-weight:800;color:#4f46e5;line-height:1">
+                        {{ stats.total_points }}
+                    </div>
+                    <div class="small text-muted">Total Points</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Subject Progress Bars -->
+    <h5 style="font-family:'Baloo 2',sans-serif;font-weight:700;margin-bottom:20px">
+        <i class="fa-solid fa-bars-progress"></i> Subject Progress
+    </h5>
+    <div class="row g-4 mb-5">
+        {% for sp in subject_progress %}
+        <div class="col-md-6">
+            <div style="background:white;border-radius:20px;padding:24px;box-shadow:0 4px 16px rgba(0,0,0,0.06)">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div class="subject-icon-box" style="width:48px;height:48px;font-size:1.2rem;margin:0">
+                        <i class="fa-solid {{ sp.icon }}"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <div style="font-family:'Baloo 2',sans-serif;font-weight:700">{{ sp.subject_name }}</div>
+                        <div class="small text-muted">{{ sp.attempted }}/{{ sp.total_topics }} topics attempted</div>
+                    </div>
+                    <div style="font-family:'Baloo 2',sans-serif;font-weight:800;font-size:1.3rem;
+                                color:{{ '#16a34a' if sp.pct >= 80 else '#f59e0b' if sp.pct >= 40 else '#6366f1' }}">
+                        {{ sp.pct }}%
+                    </div>
+                </div>
+                <!-- Progress Bar -->
+                <div style="height:10px;background:#f1f5f9;border-radius:10px;overflow:hidden">
+                    <div style="height:100%;border-radius:10px;width:{{ sp.pct }}%;
+                                background:{{ '#22c55e' if sp.pct >= 80 else '#f59e0b' if sp.pct >= 40 else '#6366f1' }};
+                                transition:width 1s ease"></div>
+                </div>
+                {% if sp.avg_score > 0 %}
+                <div class="small text-muted mt-2">
+                    <i class="fa-solid fa-chart-simple"></i> Avg score: {{ sp.avg_score }}%
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Recent Quiz History -->
+    <h5 style="font-family:'Baloo 2',sans-serif;font-weight:700;margin-bottom:20px">
+        <i class="fa-solid fa-clock-rotate-left"></i> Recent Quizzes
+    </h5>
+    {% if recent_results %}
+    <div style="background:white;border-radius:20px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.06)">
+        {% for r in recent_results %}
+        {% set pct = (r.score / r.total_questions * 100)|int %}
+        <div style="display:flex;align-items:center;gap:16px;padding:16px 24px;
+                    border-bottom:1px solid #f1f5f9">
+            <div style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;
+                        justify-content:center;font-family:'Baloo 2',sans-serif;font-weight:800;
+                        background:{{ '#dcfce7' if pct >= 80 else '#fef9c3' if pct >= 50 else '#fee2e2' }};
+                        color:{{ '#16a34a' if pct >= 80 else '#ca8a04' if pct >= 50 else '#dc2626' }}">
+                {{ pct }}%
+            </div>
+            <div class="flex-grow-1">
+                <div style="font-weight:700">{{ r.topic_name }}</div>
+                <div class="small text-muted">{{ r.subject_name }} · {{ r.attempted_at.strftime('%d %b %Y') }}</div>
+            </div>
+            <div style="font-family:'Baloo 2',sans-serif;font-weight:800">
+                {{ r.score }}/{{ r.total_questions }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-4 text-muted">
+        <i class="fa-solid fa-chart-line fa-2x mb-2"></i>
+        <p>No quizzes taken yet. Start quizzing to track progress!</p>
+        <a href="{{ url_for('student_dashboard') }}" class="btn-primary-ms">Start Quiz</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

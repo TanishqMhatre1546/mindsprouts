@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% block title %}My Profile - MindSprouts{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="container">
+        <h1><i class="fa-solid fa-user"></i> My Profile</h1>
+        <p class="mb-0 opacity-75">Your stats and settings</p>
+    </div>
+</div>
+
+<div class="container" style="max-width:800px">
+    <div class="row g-4">
+
+        <!-- Profile Card -->
+        <div class="col-md-4">
+            <div style="background:white;border-radius:24px;padding:32px;
+                        text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.07)">
+                <div class="avatar-circle mx-auto mb-3">
+                    {{ session.display_name[0].upper() }}
+                </div>
+                <h4 style="font-family:'Baloo 2',sans-serif;font-weight:800">
+                    {{ session.display_name }}
+                </h4>
+                <p class="text-muted mb-1">@{{ student.username }}</p>
+                <span class="badge"
+                      style="background:#eef2ff;color:#6366f1;font-size:0.85rem;padding:6px 14px">
+                    Grade {{ student.grade }}
+                </span>
+
+                <hr class="my-3">
+
+                <div class="d-flex justify-content-around">
+                    <div class="text-center">
+                        <div style="font-family:'Baloo 2',sans-serif;font-weight:800;
+                                    font-size:1.5rem;color:#6366f1">
+                            {{ student.total_points }}
+                        </div>
+                        <div class="small text-muted">Points</div>
+                    </div>
+                    <div class="text-center">
+                        <div style="font-family:'Baloo 2',sans-serif;font-weight:800;
+                                    font-size:1.5rem;color:#ea580c">
+                            {{ student.current_streak }}
+                        </div>
+                        <div class="small text-muted">Streak</div>
+                    </div>
+                    <div class="text-center">
+                        <div style="font-family:'Baloo 2',sans-serif;font-weight:800;
+                                    font-size:1.5rem;color:#16a34a">
+                            {{ total_quizzes }}
+                        </div>
+                        <div class="small text-muted">Quizzes</div>
+                    </div>
+                </div>
+
+                <hr class="my-3">
+
+                <div class="text-start small">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Best Streak</span>
+                        <strong>{{ student.longest_streak }} days</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Member since</span>
+                        <strong>{{ student.created_at.strftime('%b %Y') }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="col-md-8">
+
+            <!-- Subject Stats -->
+            <div style="background:white;border-radius:20px;padding:24px;
+                        box-shadow:0 4px 16px rgba(0,0,0,0.06);margin-bottom:20px">
+                <h5 style="font-family:'Baloo 2',sans-serif;font-weight:700;margin-bottom:16px">
+                    <i class="fa-solid fa-chart-pie"></i> Performance by Subject
+                </h5>
+                {% if subject_stats %}
+                    {% for ss in subject_stats %}
+                    {% set avg = ss.avg_score|round|int %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="fw-bold small">{{ ss.subject_name }}</span>
+                            <span class="small text-muted">
+                                {{ ss.count }} quizzes · avg {{ avg }}%
+                            </span>
+                        </div>
+                        <div style="height:8px;background:#f1f5f9;border-radius:8px;overflow:hidden">
+                            <div style="height:100%;border-radius:8px;width:{{ avg }}%;
+                                        background:{{ '#22c55e' if avg >= 80 else '#f59e0b' if avg >= 50 else '#ef4444' }};
+                                        transition:width 1s ease">
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted small">
+                        No quizzes taken yet.
+                        <a href="{{ url_for('student_dashboard') }}">Start now!</a>
+                    </p>
+                {% endif %}
+            </div>
+
+            <!-- Change Password -->
+            <div style="background:white;border-radius:20px;padding:24px;
+                        box-shadow:0 4px 16px rgba(0,0,0,0.06)">
+                <h5 style="font-family:'Baloo 2',sans-serif;font-weight:700;margin-bottom:16px">
+                    <i class="fa-solid fa-lock"></i> Change Password
+                </h5>
+                <form action="{{ url_for('change_password') }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Current Password</label>
+                        <input type="password" name="current_password"
+                               class="form-control" required
+                               placeholder="Enter current password">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">New Password</label>
+                        <input type="password" name="new_password"
+                               class="form-control" required
+                               placeholder="Enter new password">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small">Confirm New Password</label>
+                        <input type="password" name="confirm_password"
+                               class="form-control" required
+                               placeholder="Confirm new password">
+                    </div>
+                    <button type="submit" class="btn-primary-ms">
+                        <i class="fa-solid fa-lock"></i> Update Password
+                    </button>
+                </form>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

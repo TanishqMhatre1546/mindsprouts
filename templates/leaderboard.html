@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block title %}Leaderboard - MindSprouts{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="container">
+        <h1><i class="fa-solid fa-trophy"></i> Leaderboard</h1>
+        <p class="mb-0 opacity-75">Top 10 students by total points</p>
+    </div>
+</div>
+
+<div class="container" style="max-width:640px">
+    {% for s in leaders %}
+    {% set is_me = s.display_name == session.display_name %}
+    <div class="leaderboard-row pop-in {% if is_me %}leaderboard-me{% endif %}"
+         style="animation-delay:{{ loop.index0 * 0.07 }}s">
+        <div class="rank-badge {{ 'rank-1' if loop.index == 1 else 'rank-2' if loop.index == 2 else 'rank-3' if loop.index == 3 else 'rank-other' }}">
+            {% if loop.index <= 3 %}
+                <i class="fa-solid fa-trophy"></i>
+            {% else %}
+                {{ loop.index }}
+            {% endif %}
+        </div>
+        <div class="flex-grow-1">
+            <div style="font-family:'Baloo 2',sans-serif;font-weight:700;font-size:1.05rem">
+                {{ s.display_name }}
+                {% if is_me %}
+                <span class="badge ms-1"
+                      style="background:#eef2ff;color:#6366f1;font-size:0.7rem">
+                    You
+                </span>
+                {% endif %}
+            </div>
+            <div class="small text-muted d-flex align-items-center gap-2">
+                Grade {{ s.grade }}
+                {% if s.current_streak > 0 %}
+                <span style="color:#ea580c">
+                    <i class="fa-solid fa-fire"></i> {{ s.current_streak }}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="points-badge">
+            <i class="fa-solid fa-star"></i> {{ s.total_points }} pts
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fa-solid fa-users fa-3x text-muted mb-3"></i>
+        <h4>No students yet!</h4>
+        <p class="text-muted">Be the first to earn points!</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

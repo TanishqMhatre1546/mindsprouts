@@ -1,0 +1,271 @@
+{% extends 'base.html' %}
+{% block title %}Manage Questions{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="container">
+        <a href="{{ url_for('admin_dashboard') }}" class="btn-back-header">
+            <i class="fa-solid fa-arrow-left"></i> Back
+        </a>
+        <h1><i class="fa-solid fa-circle-question"></i> Manage Questions</h1>
+        <p class="mb-0 opacity-75">{{ questions|length }} questions total</p>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- Add Question -->
+    <div style="background:white;border-radius:20px;padding:24px;
+                box-shadow:0 4px 16px rgba(0,0,0,0.06);margin-bottom:28px">
+        <h5 style="font-family:'Baloo 2',sans-serif;font-weight:700;margin-bottom:18px">
+            <i class="fa-solid fa-plus"></i> Add New Question
+        </h5>
+        <form action="{{ url_for('add_question') }}" method="POST">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold small">Topic</label>
+                    <select name="topic_id" class="form-select" required>
+                        <option value="">Select topic...</option>
+                        {% for t in topics %}
+                        <option value="{{ t.topic_id }}">
+                            [Gr.{{ t.grade }}] {{ t.subject_name }} → {{ t.topic_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label fw-bold small">Question</label>
+                    <input type="text" name="question_text" class="form-control"
+                           placeholder="Enter question text..." required>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label fw-bold small">Option A</label>
+                    <input type="text" name="option_a" class="form-control"
+                           placeholder="Option A" required>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label fw-bold small">Option B</label>
+                    <input type="text" name="option_b" class="form-control"
+                           placeholder="Option B" required>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label fw-bold small">Option C</label>
+                    <input type="text" name="option_c" class="form-control"
+                           placeholder="Option C" required>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label fw-bold small">Option D</label>
+                    <input type="text" name="option_d" class="form-control"
+                           placeholder="Option D" required>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label fw-bold small">Correct Answer</label>
+                    <select name="correct_option" class="form-select" required>
+                        <option value="">Select...</option>
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="C">C</option>
+                        <option value="D">D</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn-primary-ms w-100">
+                        <i class="fa-solid fa-plus"></i> Add
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Filters -->
+    <div class="d-flex gap-2 mb-3 flex-wrap">
+        <input type="text" id="searchBox" class="form-control"
+               style="max-width:300px"
+               placeholder="Search questions..."
+               oninput="filterQ()">
+        <select id="gradeFilter" class="form-select"
+                style="max-width:130px" onchange="filterQ()">
+            <option value="">All Grades</option>
+            <option value="1">Grade 1</option>
+            <option value="2">Grade 2</option>
+            <option value="3">Grade 3</option>
+            <option value="4">Grade 4</option>
+            <option value="5">Grade 5</option>
+        </select>
+    </div>
+
+    <!-- Questions Table -->
+    <div style="background:white;border-radius:20px;
+                box-shadow:0 4px 16px rgba(0,0,0,0.06);overflow:hidden">
+        <div style="overflow-x:auto">
+            <table class="table table-hover mb-0" id="qTable" style="min-width:700px">
+                <thead style="background:#f8faff">
+                    <tr>
+                        <th>#</th>
+                        <th>Question</th>
+                        <th>Subject</th>
+                        <th>Grade</th>
+                        <th>Correct</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for q in questions %}
+                    <tr data-grade="{{ q.grade }}">
+                        <td class="text-muted small">{{ q.question_id }}</td>
+                        <td style="max-width:280px;font-size:0.9rem">
+                            {{ q.question_text }}
+                        </td>
+                        <td>
+                            <span class="badge"
+                                  style="background:#eef2ff;color:#6366f1">
+                                {{ q.subject_name }}
+                            </span>
+                        </td>
+                        <td class="small">Gr. {{ q.grade }}</td>
+                        <td>
+                            <span class="badge"
+                                  style="background:#dcfce7;color:#16a34a;
+                                         font-size:0.85rem">
+                                {{ q.correct_option }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <button class="btn btn-sm"
+                                        style="background:#eef2ff;color:#6366f1;border:none"
+                                        onclick="openEdit(
+                                            {{ q.question_id }},
+                                            {{ q.topic_id }},
+                                            `{{ q.question_text|replace('`','\\`') }}`,
+                                            `{{ q.option_a|replace('`','\\`') }}`,
+                                            `{{ q.option_b|replace('`','\\`') }}`,
+                                            `{{ q.option_c|replace('`','\\`') }}`,
+                                            `{{ q.option_d|replace('`','\\`') }}`,
+                                            `{{ q.correct_option }}`
+                                        )">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <a href="{{ url_for('delete_question', qid=q.question_id) }}"
+                                   class="btn btn-sm btn-danger"
+                                   onclick="return confirm('Delete this question?')">
+                                    <i class="fa-solid fa-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" style="border-radius:20px;border:none">
+            <div class="modal-header"
+                 style="border-bottom:1px solid #f1f5f9">
+                <h5 class="modal-title"
+                    style="font-family:'Baloo 2',sans-serif;font-weight:700">
+                    <i class="fa-solid fa-pen"></i> Edit Question
+                </h5>
+                <button type="button" class="btn-close"
+                        data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editForm" method="POST">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-bold small">Topic</label>
+                            <select name="topic_id" id="edit_topic"
+                                    class="form-select" required>
+                                {% for t in topics %}
+                                <option value="{{ t.topic_id }}">
+                                    [Gr.{{ t.grade }}] {{ t.subject_name }} → {{ t.topic_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small">Question</label>
+                            <input type="text" name="question_text"
+                                   id="edit_question" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small">Option A</label>
+                            <input type="text" name="option_a" id="edit_a"
+                                   class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small">Option B</label>
+                            <input type="text" name="option_b" id="edit_b"
+                                   class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small">Option C</label>
+                            <input type="text" name="option_c" id="edit_c"
+                                   class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small">Option D</label>
+                            <input type="text" name="option_d" id="edit_d"
+                                   class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small">
+                                Correct Answer
+                            </label>
+                            <select name="correct_option" id="edit_correct"
+                                    class="form-select" required>
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                                <option value="C">C</option>
+                                <option value="D">D</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer"
+                     style="border-top:1px solid #f1f5f9">
+                    <button type="button" class="btn-outline-ms"
+                            data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn-primary-ms">
+                        <i class="fa-solid fa-check"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterQ() {
+    const search = document.getElementById('searchBox').value.toLowerCase();
+    const grade  = document.getElementById('gradeFilter').value;
+    document.querySelectorAll('#qTable tbody tr').forEach(row => {
+        const text     = row.textContent.toLowerCase();
+        const rowGrade = row.dataset.grade;
+        row.style.display =
+            text.includes(search) && (!grade || rowGrade === grade)
+            ? '' : 'none';
+    });
+}
+
+function openEdit(id, topicId, question, a, b, c, d, correct) {
+    document.getElementById('editForm').action =
+        `/admin/questions/edit/${id}`;
+    document.getElementById('edit_topic').value    = topicId;
+    document.getElementById('edit_question').value = question;
+    document.getElementById('edit_a').value        = a;
+    document.getElementById('edit_b').value        = b;
+    document.getElementById('edit_c').value        = c;
+    document.getElementById('edit_d').value        = d;
+    document.getElementById('edit_correct').value  = correct;
+    new bootstrap.Modal(document.getElementById('editModal')).show();
+}
+</script>
+{% endblock %}

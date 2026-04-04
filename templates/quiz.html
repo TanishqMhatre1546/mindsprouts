@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block title %}Quiz - {{ topic.topic_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:740px">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 style="font-family:'Baloo 2',sans-serif;font-weight:800;margin:0">
+                {{ topic.topic_name }}
+            </h4>
+            <span class="small text-muted">Grade {{ session.grade }}</span>
+        </div>
+        <span class="points-badge">
+            <i class="fa-solid fa-star"></i> +10 per correct
+        </span>
+    </div>
+
+    <div class="quiz-progress mb-1">
+        <div class="quiz-progress-fill" id="progress-fill" style="width:10%"></div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <span class="small fw-bold text-muted" id="q-counter">
+            Question 1 of {{ questions|length }}
+        </span>
+        {% if session.timer_enabled %}
+        <div class="timer-box" id="timer-display">
+            <i class="fa-solid fa-stopwatch"></i>
+            <span id="timer-num">15</span>s
+        </div>
+        {% else %}
+        <span class="small text-muted">{{ questions|length }} questions</span>
+        {% endif %}
+    </div>
+
+    <form id="quiz-form" action="{{ url_for('submit_quiz') }}" method="POST">
+        {% for q in questions %}
+        <div class="question-block quiz-card pop-in"
+             data-qid="{{ q.question_id }}"
+             style="display:none">
+
+            <div class="question-text">
+                <span style="color:#6366f1;font-size:1rem">Q{{ loop.index }}.</span>
+                {{ q.question_text }}
+            </div>
+
+            {% for option, label in [('option_a','A'),('option_b','B'),('option_c','C'),('option_d','D')] %}
+            <button type="button" class="option-btn"
+                    data-qid="{{ q.question_id }}"
+                    data-option="{{ label }}">
+                <span class="option-label">{{ label }}</span>
+                {{ q[option] }}
+            </button>
+            {% endfor %}
+
+            <input type="hidden"
+                   name="q_{{ q.question_id }}"
+                   id="hidden_{{ q.question_id }}"
+                   value="">
+
+            <div class="d-flex justify-content-end mt-4">
+                <button type="button" class="btn-primary-ms next-btn" disabled>
+                    {% if loop.last %}
+                        <i class="fa-solid fa-flag-checkered"></i> Submit Quiz
+                    {% else %}
+                        Next <i class="fa-solid fa-arrow-right"></i>
+                    {% endif %}
+                </button>
+            </div>
+
+        </div>
+        {% endfor %}
+    </form>
+</div>
+{% endblock %}

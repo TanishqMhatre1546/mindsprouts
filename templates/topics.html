@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block title %}{{ subject.subject_name }} - Topics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="container">
+        <a href="..." class="btn-back-header">
+    <i class="fa-solid fa-arrow-left"></i> Back
+</a>
+        <div class="d-flex align-items-center gap-3">
+            <div class="subject-icon-box"
+                 style="width:56px;height:56px;font-size:1.4rem;margin:0">
+                <i class="fa-solid {{ subject.icon }}"></i>
+            </div>
+            <div>
+                <h1 class="mb-0">{{ subject.subject_name }}</h1>
+                <p class="mb-0 opacity-75">
+                    Grade {{ session.grade }} —
+                    {{ attempted|length }}/{{ topics|length }} topics attempted
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container" style="max-width:700px">
+
+    <!-- Progress bar for this subject -->
+    {% if topics|length > 0 %}
+    <div class="mb-4">
+        <div class="d-flex justify-content-between small text-muted mb-1">
+            <span>Subject Progress</span>
+            <span>{{ ((attempted|length / topics|length) * 100)|int }}%</span>
+        </div>
+        <div style="height:8px;background:#e2e8f0;border-radius:8px;overflow:hidden">
+            <div style="height:100%;border-radius:8px;
+                        width:{{ ((attempted|length / topics|length) * 100)|int }}%;
+                        background:linear-gradient(90deg,#6366f1,#8b5cf6);
+                        transition:width 1s ease">
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if topics %}
+        {% for topic in topics %}
+        {% set is_done = topic.topic_name in attempted %}
+        <a href="{{ url_for('quiz', topic_id=topic.topic_id) }}"
+           class="topic-card mb-3 fade-in"
+           style="animation-delay:{{ loop.index0 * 0.07 }}s">
+            <div class="topic-num {% if is_done %}topic-num-done{% endif %}">
+                {% if is_done %}
+                    <i class="fa-solid fa-check"></i>
+                {% else %}
+                    {{ loop.index }}
+                {% endif %}
+            </div>
+            <div class="flex-grow-1">
+                <div style="font-family:'Baloo 2',sans-serif;font-weight:700;font-size:1.05rem">
+                    {{ topic.topic_name }}
+                </div>
+                <div class="small text-muted">
+                    {% if is_done %}
+                        <span style="color:#16a34a">
+                            <i class="fa-solid fa-check-circle"></i> Attempted
+                        </span>
+                        · 10 questions · +10 pts each
+                    {% else %}
+                        10 questions · +10 pts each
+                    {% endif %}
+                </div>
+            </div>
+            <i class="fa-solid fa-chevron-right text-muted"></i>
+        </a>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">
+            <i class="fa-solid fa-face-sad-tear fa-3x text-muted mb-3"></i>
+            <h4>No topics yet!</h4>
+            <p class="text-muted">Topics for this subject will be added soon.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% block title %}Admin Dashboard - MindSprouts{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="container">
+        <h1><i class="fa-solid fa-gauge"></i> Admin Dashboard</h1>
+        <p class="mb-0 opacity-75">Welcome, {{ session.display_name }}!</p>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- Stat Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="stat-card">
+                <div class="stat-icon" style="background:#eef2ff">
+                    <i class="fa-solid fa-users" style="color:#6366f1"></i>
+                </div>
+                <div>
+                    <div style="font-family:'Baloo 2',sans-serif;
+                                font-size:2rem;font-weight:800;line-height:1">
+                        {{ total_students }}
+                    </div>
+                    <div class="text-muted small">Total Students</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card">
+                <div class="stat-icon" style="background:#fef9c3">
+                    <i class="fa-solid fa-circle-question"
+                       style="color:#eab308"></i>
+                </div>
+                <div>
+                    <div style="font-family:'Baloo 2',sans-serif;
+                                font-size:2rem;font-weight:800;line-height:1">
+                        {{ total_questions }}
+                    </div>
+                    <div class="text-muted small">Total Questions</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card">
+                <div class="stat-icon" style="background:#dcfce7">
+                    <i class="fa-solid fa-clipboard-list"
+                       style="color:#22c55e"></i>
+                </div>
+                <div>
+                    <div style="font-family:'Baloo 2',sans-serif;
+                                font-size:2rem;font-weight:800;line-height:1">
+                        {{ total_results }}
+                    </div>
+                    <div class="text-muted small">Quizzes Taken</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Links -->
+    <div class="row g-3 mb-5">
+        <div class="col-md-4">
+            <a href="{{ url_for('manage_questions') }}"
+               class="btn-primary-ms w-100 justify-content-center">
+                <i class="fa-solid fa-circle-question"></i>
+                Manage Questions
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="{{ url_for('manage_students') }}"
+               class="btn-outline-ms w-100 justify-content-center">
+                <i class="fa-solid fa-users"></i>
+                Manage Students
+            </a>
+        </div>
+        {% if session.is_super_admin %}
+        <div class="col-md-4">
+            <a href="{{ url_for('manage_admins') }}"
+               class="btn-outline-ms w-100 justify-content-center">
+                <i class="fa-solid fa-user-shield"></i>
+                Manage Admins
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Results -->
+    <h5 style="font-family:'Baloo 2',sans-serif;font-weight:700;
+               margin-bottom:16px">
+        <i class="fa-solid fa-clock-rotate-left"></i> Recent Quiz Results
+    </h5>
+
+    {% if recent %}
+    <div style="background:white;border-radius:20px;
+                box-shadow:0 4px 16px rgba(0,0,0,0.06);overflow:hidden">
+        <div style="overflow-x:auto">
+            <table class="table table-hover mb-0" style="min-width:600px">
+                <thead style="background:#f8faff">
+                    <tr>
+                        <th>Student</th>
+                        <th>Subject</th>
+                        <th>Topic</th>
+                        <th>Grade</th>
+                        <th>Score</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in recent %}
+                    {% set pct = (r.score / r.total_questions * 100)|int %}
+                    <tr>
+                        <td class="fw-bold">{{ r.student_name }}</td>
+                        <td>{{ r.subject_name }}</td>
+                        <td>{{ r.topic_name }}</td>
+                        <td>Grade {{ r.grade }}</td>
+                        <td>
+                            <span class="badge"
+                                  style="background:{{ '#dcfce7' if pct >= 80 else '#fef9c3' if pct >= 50 else '#fee2e2' }};
+                                         color:{{ '#16a34a' if pct >= 80 else '#ca8a04' if pct >= 50 else '#dc2626' }};
+                                         font-size:0.85rem;padding:5px 10px">
+                                {{ r.score }}/{{ r.total_questions }}
+                                ({{ pct }}%)
+                            </span>
+                        </td>
+                        <td class="text-muted small">
+                            {{ r.attempted_at.strftime('%d %b %Y') }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fa-solid fa-clipboard-list fa-3x mb-3"></i>
+        <h5>No quiz results yet</h5>
+        <p>Results will appear here once students start taking quizzes.</p>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

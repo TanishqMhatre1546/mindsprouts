@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% block title %}Manage Admins{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="container">
+        <a href="{{ url_for('admin_dashboard') }}" class="btn-back-header">
+            <i class="fa-solid fa-arrow-left"></i> Back
+        </a>
+        <h1><i class="fa-solid fa-user-shield"></i> Manage Admins</h1>
+        <p class="mb-0 opacity-75">Super Admin only</p>
+    </div>
+</div>
+
+<div class="container" style="max-width:860px">
+
+    <!-- Add Admin -->
+    <div style="background:white;border-radius:20px;padding:24px;
+                box-shadow:0 4px 16px rgba(0,0,0,0.06);margin-bottom:28px">
+        <h5 style="font-family:'Baloo 2',sans-serif;font-weight:700;margin-bottom:18px">
+            <i class="fa-solid fa-plus"></i> Add New Admin
+        </h5>
+        <form action="{{ url_for('add_admin') }}" method="POST">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold small">Display Name</label>
+                    <input type="text" name="display_name" class="form-control"
+                           placeholder="Full name" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold small">Username</label>
+                    <input type="text" name="username" class="form-control"
+                           placeholder="Login username" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold small">Password</label>
+                    <input type="password" name="password" class="form-control"
+                           placeholder="Set password" required>
+                </div>
+                <div class="col-12 d-flex align-items-center gap-3 flex-wrap">
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="checkbox" name="is_super_admin"
+                               id="superCheck" class="form-check-input"
+                               style="width:18px;height:18px">
+                        <label for="superCheck" class="form-check-label fw-bold">
+                            Grant Super Admin privileges
+                        </label>
+                    </div>
+                    <button type="submit" class="btn-primary-ms">
+                        <i class="fa-solid fa-plus"></i> Add Admin
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Admins Table -->
+    <div style="background:white;border-radius:20px;
+                box-shadow:0 4px 16px rgba(0,0,0,0.06);overflow:hidden">
+        <div style="overflow-x:auto">
+            <table class="table table-hover mb-0" style="min-width:500px">
+                <thead style="background:#f8faff">
+                    <tr>
+                        <th>Name</th>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Joined</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in admins %}
+                    <tr>
+                        <td><strong>{{ a.display_name }}</strong></td>
+                        <td class="text-muted">{{ a.username }}</td>
+                        <td>
+                            {% if a.is_super_admin %}
+                            <span class="admin-badge" style="font-size:0.8rem;padding:4px 12px">
+                                <i class="fa-solid fa-shield-halved"></i> Super Admin
+                            </span>
+                            {% else %}
+                            <span class="badge"
+                                  style="background:#f1f5f9;color:#64748b;
+                                         font-size:0.85rem;padding:5px 12px">
+                                Admin
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted small">
+                            {{ a.created_at.strftime('%d %b %Y') }}
+                        </td>
+                        <td>
+                            {% if a.admin_id != session.admin_id %}
+                            <a href="{{ url_for('delete_admin', aid=a.admin_id) }}"
+                               class="btn btn-sm btn-danger"
+                               onclick="return confirm('Remove this admin?')">
+                                <i class="fa-solid fa-trash"></i>
+                            </a>
+                            {% else %}
+                            <span class="text-muted small">You</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

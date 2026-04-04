@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% block title %}Result - MindSprouts{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width:680px">
+
+    {% set pct = (score / total * 100)|int %}
+
+    <!-- Score Card -->
+    <div class="result-card pop-in mb-4">
+
+        <!-- Badge -->
+        {% if pct >= 80 %}
+        <div class="score-circle badge-gold mb-3">
+            <i class="fa-solid fa-star fa-2x" style="color:white"></i>
+            <span style="color:white;font-weight:800;font-size:0.9rem">GOLD</span>
+        </div>
+        <h2 style="font-family:'Baloo 2',sans-serif;font-weight:800;color:#d97706">
+            Excellent Work!
+        </h2>
+        {% elif pct >= 50 %}
+        <div class="score-circle badge-silver mb-3">
+            <i class="fa-solid fa-star fa-2x" style="color:white"></i>
+            <span style="color:white;font-weight:800;font-size:0.9rem">SILVER</span>
+        </div>
+        <h2 style="font-family:'Baloo 2',sans-serif;font-weight:800;color:#64748b">
+            Good Job!
+        </h2>
+        {% else %}
+        <div class="score-circle badge-practice mb-3">
+            <i class="fa-solid fa-rotate fa-2x" style="color:white"></i>
+            <span style="color:white;font-weight:800;font-size:0.9rem">KEEP GOING</span>
+        </div>
+        <h2 style="font-family:'Baloo 2',sans-serif;font-weight:800;color:#16a34a">
+            Keep Practising!
+        </h2>
+        {% endif %}
+
+        <p class="text-muted mb-4">{{ topic_name }} · {{ subject_name }}</p>
+
+        <!-- Score Numbers -->
+        <div class="row g-3 mb-4">
+            <div class="col-4">
+                <div class="score-stat-box" style="background:#f0fdf4">
+                    <div class="score-stat-num" style="color:#16a34a">{{ score }}</div>
+                    <div class="score-stat-label">Correct</div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="score-stat-box" style="background:#fff7ed">
+                    <div class="score-stat-num" style="color:#ea580c">{{ pct }}%</div>
+                    <div class="score-stat-label">Score</div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="score-stat-box" style="background:#fefce8">
+                    <div class="score-stat-num" style="color:#ca8a04">+{{ points_earned }}</div>
+                    <div class="score-stat-label">Points</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Streak Milestone -->
+        {% if current_streak >= 2 %}
+        <div class="streak-milestone mb-4">
+            <i class="fa-solid fa-fire"></i>
+            {% if current_streak == 2 %}
+                2 day streak! You're building a habit!
+            {% elif current_streak == 3 %}
+                3 day streak! Keep it up!
+            {% elif current_streak == 5 %}
+                5 day streak! You're on fire!
+            {% elif current_streak == 7 %}
+                7 day streak! One full week! Amazing!
+            {% elif current_streak >= 10 %}
+                {{ current_streak }} day streak! You're unstoppable!
+            {% else %}
+                {{ current_streak }} day streak! Great consistency!
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Action Buttons -->
+        <div class="d-flex gap-3 justify-content-center flex-wrap">
+            <a href="{{ url_for('student_dashboard') }}" class="btn-outline-ms">
+                <i class="fa-solid fa-house"></i> Home
+            </a>
+            <a href="{{ url_for('quiz', topic_id=session.quiz_topic_id) }}"
+               class="btn-outline-ms" style="border-color:#f59e0b;color:#f59e0b">
+                <i class="fa-solid fa-rotate-right"></i> Retry
+            </a>
+            <a href="{{ url_for('leaderboard') }}" class="btn-primary-ms">
+                <i class="fa-solid fa-trophy"></i> Leaderboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Answer Review -->
+    <h5 style="font-family:'Baloo 2',sans-serif;font-weight:700;margin-bottom:16px">
+        <i class="fa-solid fa-list-check"></i> Answer Review
+    </h5>
+    {% for item in review %}
+    <div class="review-item {{ 'correct' if item.is_correct else 'wrong' }} fade-in"
+         style="animation-delay:{{ loop.index0 * 0.05 }}s">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+            <div class="fw-bold small">Q{{ loop.index }}. {{ item.question }}</div>
+            {% if item.is_correct %}
+                <span class="badge bg-success ms-2">Correct</span>
+            {% else %}
+                <span class="badge bg-danger ms-2">Wrong</span>
+            {% endif %}
+        </div>
+        <div class="small">
+            <span class="text-muted">Your answer: </span>
+            <strong style="color:{{ '#16a34a' if item.is_correct else '#ef4444' }}">
+                {{ item.user }})
+                {% if item.user == 'A' %}{{ item.option_a }}
+                {% elif item.user == 'B' %}{{ item.option_b }}
+                {% elif item.user == 'C' %}{{ item.option_c }}
+                {% elif item.user == 'D' %}{{ item.option_d }}
+                {% else %}No answer{% endif %}
+            </strong>
+            {% if not item.is_correct %}
+            ·
+            <span class="text-muted">Correct: </span>
+            <strong style="color:#16a34a">
+                {{ item.correct }})
+                {% if item.correct == 'A' %}{{ item.option_a }}
+                {% elif item.correct == 'B' %}{{ item.option_b }}
+                {% elif item.correct == 'C' %}{{ item.option_c }}
+                {% elif item.correct == 'D' %}{{ item.option_d }}{% endif %}
+            </strong>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% set pct = (score / total * 100)|int %}
+{% if pct >= 50 %}
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+<script>
+window.addEventListener('load', function () {
+    confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+    setTimeout(() => confetti({ particleCount: 80, angle: 60, spread: 55, origin: { x: 0 } }), 400);
+    setTimeout(() => confetti({ particleCount: 80, angle: 120, spread: 55, origin: { x: 1 } }), 700);
+});
+</script>
+{% endif %}
+{% endblock %}

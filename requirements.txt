@@ -1,0 +1,11 @@
+Step 1 — Switch to D drive:
+d:
+
+Step 2 — Go to your folder:
+cd STUDY\mindsprouts
+
+Step 3 — Confirm:
+dir
+
+Step 4 — Run the app:
+python app.py
