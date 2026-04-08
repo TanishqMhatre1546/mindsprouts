@@ -1,22 +1,54 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-import pymysql
-import pymysql.cursors
+import psycopg2
+import psycopg2.extras
 import hashlib
 import random
 from datetime import date
 import os
 
 app = Flask(__name__)
-app.secret_key = 'mindsprouts_secret_2024'
+# In production, set SECRET_KEY as an environment variable.
+secret_key = os.environ.get('SECRET_KEY')
+if not secret_key:
+    raise RuntimeError("SECRET_KEY environment variable is required (set it in Render).")
+app.secret_key = secret_key
 
 def get_db():
-    return pymysql.connect(
-        host=os.environ.get('MYSQLHOST', 'mysql.railway.internal'),
-        user=os.environ.get('MYSQLUSER', 'root'),
-        password=os.environ.get('MYSQLPASSWORD', 'YpRcPNQtljAXFvAnvcsTZOjAMcuaURYx'),
-        database=os.environ.get('MYSQLDATABASE', 'railway'),
-        port=int(os.environ.get('MYSQLPORT', 3306)),
-        cursorclass=pymysql.cursors.DictCursor
+    # Prefer Render's DATABASE_URL if available.
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url:
+        return psycopg2.connect(database_url, cursor_factory=psycopg2.extras.RealDictCursor)
+
+    pg_host = os.environ.get('PGHOST')
+    pg_user = os.environ.get('PGUSER')
+    pg_password = os.environ.get('PGPASSWORD')
+    pg_database = os.environ.get('PGDATABASE')
+    pg_port = int(os.environ.get('PGPORT', 5432))
+
+    missing = [
+        name
+        for name, value in [
+            ('PGHOST', pg_host),
+            ('PGUSER', pg_user),
+            ('PGPASSWORD', pg_password),
+            ('PGDATABASE', pg_database),
+        ]
+        if not value
+    ]
+    if missing:
+        raise RuntimeError(
+            "Missing required Postgres env vars: "
+            + ", ".join(missing)
+            + " (set them in Render)."
+        )
+
+    return psycopg2.connect(
+        host=pg_host,
+        user=pg_user,
+        password=pg_password,
+        dbname=pg_database,
+        port=pg_port,
+        cursor_factory=psycopg2.extras.RealDictCursor,
     )
 
 def hash_password(password):
