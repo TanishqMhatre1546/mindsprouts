@@ -122,6 +122,11 @@ def health():
         app.logger.exception("health_check_failed")
         return {'status': 'error', 'database': 'down'}, 503
 
+@app.route('/live')
+def live():
+    # Liveness probe: process is up, no database dependency.
+    return {'status': 'alive'}, 200
+
 @app.route('/')
 def index():
     if 'student_id' in session:
