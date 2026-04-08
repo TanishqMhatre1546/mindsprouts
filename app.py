@@ -11,10 +11,10 @@ app.secret_key = 'mindsprouts_secret_2024'
 
 def get_db():
     return pymysql.connect(
-        host=os.environ.get('MYSQLHOST', 'localhost'),
+        host=os.environ.get('MYSQLHOST', 'mysql.railway.internal'),
         user=os.environ.get('MYSQLUSER', 'root'),
-        password=os.environ.get('MYSQLPASSWORD', 'Tanishq2006'),
-        database=os.environ.get('MYSQLDATABASE', 'mindsprouts_db'),
+        password=os.environ.get('MYSQLPASSWORD', 'YpRcPNQtljAXFvAnvcsTZOjAMcuaURYx'),
+        database=os.environ.get('MYSQLDATABASE', 'railway'),
         port=int(os.environ.get('MYSQLPORT', 3306)),
         cursorclass=pymysql.cursors.DictCursor
     )
