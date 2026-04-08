@@ -5,6 +5,7 @@ import hashlib
 import random
 from datetime import date
 import os
+import logging
 
 app = Flask(__name__)
 # In production, set SECRET_KEY as an environment variable.
@@ -12,6 +13,13 @@ secret_key = os.environ.get('SECRET_KEY')
 if not secret_key:
     raise RuntimeError("SECRET_KEY environment variable is required (set it in Render).")
 app.secret_key = secret_key
+
+# Basic structured logging for production debugging on Render.
+logging.basicConfig(
+    level=os.environ.get('LOG_LEVEL', 'INFO').upper(),
+    format='%(asctime)s %(levelname)s %(message)s'
+)
+app.logger.setLevel(os.environ.get('LOG_LEVEL', 'INFO').upper())
 
 def get_db():
     # Prefer Render's DATABASE_URL if available.
@@ -83,6 +91,36 @@ def super_admin_required(f):
             return redirect(url_for('admin_dashboard'))
         return f(*args, **kwargs)
     return decorated
+
+@app.before_request
+def log_request_start():
+    app.logger.info("request_start method=%s path=%s", request.method, request.path)
+
+@app.after_request
+def log_request_end(response):
+    app.logger.info(
+        "request_end method=%s path=%s status=%s",
+        request.method,
+        request.path,
+        response.status_code
+    )
+    return response
+
+@app.route('/health')
+def health():
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT 1 AS ok")
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+        if result and result.get('ok') == 1:
+            return {'status': 'ok', 'database': 'up'}, 200
+        return {'status': 'degraded', 'database': 'unexpected_response'}, 503
+    except Exception:
+        app.logger.exception("health_check_failed")
+        return {'status': 'error', 'database': 'down'}, 503
 
 @app.route('/')
 def index():
