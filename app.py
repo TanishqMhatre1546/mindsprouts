@@ -6,6 +6,7 @@ import random
 from datetime import date
 import os
 import logging
+import uuid
 
 app = Flask(__name__)
 # In production, set SECRET_KEY as an environment variable.
@@ -253,6 +254,8 @@ def quiz(topic_id):
     session['quiz_questions']    = [q['question_id'] for q in questions]
     session['quiz_topic_id']     = topic_id
     session['quiz_topic_name']   = topic['topic_name']
+    session['quiz_attempt_token'] = str(uuid.uuid4())
+    session['quiz_submitted'] = False
     cur.execute("""
         SELECT s.subject_name FROM subjects s
         JOIN topics t ON s.subject_id = t.subject_id
@@ -269,6 +272,18 @@ def submit_quiz():
     question_ids = session.get('quiz_questions', [])
     topic_name   = session.get('quiz_topic_name')
     subject_name = session.get('quiz_subject_name')
+    submitted_token = request.form.get('quiz_attempt_token', '')
+    active_token = session.get('quiz_attempt_token', '')
+    if not question_ids or not topic_name or not subject_name:
+        flash('Quiz session expired. Please start the quiz again.', 'warning')
+        return redirect(url_for('student_dashboard'))
+    if session.get('quiz_submitted'):
+        flash('This quiz was already submitted once.', 'info')
+        return redirect(url_for('history'))
+    if not submitted_token or submitted_token != active_token:
+        flash('Invalid or expired quiz submission. Please retake the quiz.', 'warning')
+        return redirect(url_for('student_dashboard'))
+    session['quiz_submitted'] = True
     conn = get_db()
     cur  = conn.cursor()
     score  = 0

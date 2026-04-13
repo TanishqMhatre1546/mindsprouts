@@ -690,3 +690,31 @@ main { padding-bottom: 60px; }
     background: rgba(255,255,255,0.3);
     color: white;
 }
+
+/* ── PASSWORD TOGGLE ─────────────────────────────── */
+.password-toggle-wrap {
+    position: relative;
+}
+.input-group-ms .password-toggle-wrap {
+    flex: 1;
+}
+.password-toggle-wrap input[type="password"],
+.password-toggle-wrap input[type="text"] {
+    width: 100%;
+    padding-right: 42px;
+}
+.password-toggle-btn {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 4px;
+    line-height: 1;
+}
+.password-toggle-btn:hover {
+    color: #6366f1;
+}
