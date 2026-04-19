@@ -120,6 +120,33 @@ def set_quiz_duration_minutes(conn, minutes):
     conn.commit()
     cur.close()
 
+
+def fetch_topics_for_subject_with_grade_fallback(cur, subject_id, grade):
+    cur.execute(
+        "SELECT * FROM topics WHERE subject_id = %s AND grade = %s ORDER BY topic_name",
+        (subject_id, grade),
+    )
+    topics = cur.fetchall()
+    if topics:
+        return topics
+    cur.execute(
+        "SELECT * FROM topics WHERE subject_id = %s ORDER BY grade, topic_name",
+        (subject_id,),
+    )
+    return cur.fetchall()
+
+
+def count_topics_for_subject_with_grade_fallback(cur, subject_id, grade):
+    cur.execute(
+        "SELECT COUNT(*) AS total FROM topics WHERE subject_id = %s AND grade = %s",
+        (subject_id, grade),
+    )
+    total_topics = cur.fetchone()['total']
+    if total_topics > 0:
+        return total_topics
+    cur.execute("SELECT COUNT(*) AS total FROM topics WHERE subject_id = %s", (subject_id,))
+    return cur.fetchone()['total']
+
 def student_required(f):
     from functools import wraps
     @wraps(f)
@@ -287,9 +314,7 @@ def topics(subject_id):
     cur  = conn.cursor()
     cur.execute("SELECT * FROM subjects WHERE subject_id = %s", (subject_id,))
     subject = cur.fetchone()
-    cur.execute("SELECT * FROM topics WHERE subject_id = %s AND grade = %s",
-                (subject_id, session['grade']))
-    topics = cur.fetchall()
+    topics = fetch_topics_for_subject_with_grade_fallback(cur, subject_id, session['grade'])
     cur.execute("""
         SELECT DISTINCT topic_name FROM results
         WHERE student_id = %s AND subject_name = %s
@@ -471,9 +496,11 @@ def progress():
     subjects = cur.fetchall()
     subject_progress = []
     for subj in subjects:
-        cur.execute("SELECT COUNT(*) AS total FROM topics WHERE subject_id = %s AND grade = %s",
-                    (subj['subject_id'], session['grade']))
-        total_topics = cur.fetchone()['total']
+        total_topics = count_topics_for_subject_with_grade_fallback(
+            cur,
+            subj['subject_id'],
+            session['grade'],
+        )
         cur.execute("""
             SELECT COUNT(DISTINCT topic_name) AS attempted FROM results
             WHERE student_id = %s AND subject_name = %s
@@ -772,9 +799,11 @@ def student_activity(student_id):
     subjects = cur.fetchall()
     subject_progress = []
     for subj in subjects:
-        cur.execute("SELECT COUNT(*) AS total FROM topics WHERE subject_id = %s AND grade = %s",
-                    (subj['subject_id'], student['grade']))
-        total_topics = cur.fetchone()['total']
+        total_topics = count_topics_for_subject_with_grade_fallback(
+            cur,
+            subj['subject_id'],
+            student['grade'],
+        )
         cur.execute("""
             SELECT COUNT(DISTINCT topic_name) AS attempted FROM results
             WHERE student_id = %s AND subject_name = %s
