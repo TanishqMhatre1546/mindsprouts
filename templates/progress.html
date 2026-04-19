@@ -12,7 +12,7 @@
 <div class="container">
 
     <!-- Streak + Stats Row -->
-    <div class="row g-4 mb-5">
+    <div class="row g-3 mb-4">
         <div class="col-md-4">
             <div class="stat-card" style="background:linear-gradient(135deg,#fff7ed,#ffedd5)">
                 <div class="stat-icon" style="background:#fed7aa">
@@ -55,22 +55,22 @@
     </div>
 
     <!-- Subject Progress Bars -->
-    <h5 style="font-family:'Baloo 2',sans-serif;font-weight:700;margin-bottom:20px">
+    <h5 class="student-heading mb-3">
         <i class="fa-solid fa-bars-progress"></i> Subject Progress
     </h5>
-    <div class="row g-4 mb-5">
+    <div class="row g-3 mb-4">
         {% for sp in subject_progress %}
         <div class="col-md-6">
-            <div style="background:white;border-radius:20px;padding:24px;box-shadow:0 4px 16px rgba(0,0,0,0.06)">
+            <div class="student-surface p-4">
                 <div class="d-flex align-items-center gap-3 mb-3">
                     <div class="subject-icon-box" style="width:48px;height:48px;font-size:1.2rem;margin:0">
                         <i class="fa-solid {{ sp.icon }}"></i>
                     </div>
                     <div class="flex-grow-1">
-                        <div style="font-family:'Baloo 2',sans-serif;font-weight:700">{{ sp.subject_name }}</div>
+                        <div class="student-heading">{{ sp.subject_name }}</div>
                         <div class="small text-muted">{{ sp.attempted }}/{{ sp.total_topics }} topics attempted</div>
                     </div>
-                    <div style="font-family:'Baloo 2',sans-serif;font-weight:800;font-size:1.3rem;
+                    <div class="student-metric" style="font-size:1.3rem;
                                 color:{{ '#16a34a' if sp.pct >= 80 else '#f59e0b' if sp.pct >= 40 else '#6366f1' }}">
                         {{ sp.pct }}%
                     </div>
@@ -92,17 +92,16 @@
     </div>
 
     <!-- Recent Quiz History -->
-    <h5 style="font-family:'Baloo 2',sans-serif;font-weight:700;margin-bottom:20px">
+    <h5 class="student-heading mb-3">
         <i class="fa-solid fa-clock-rotate-left"></i> Recent Quizzes
     </h5>
     {% if recent_results %}
-    <div style="background:white;border-radius:20px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.06)">
+    <div class="student-surface overflow-hidden">
         {% for r in recent_results %}
         {% set pct = (r.score / r.total_questions * 100)|int %}
-        <div style="display:flex;align-items:center;gap:16px;padding:16px 24px;
-                    border-bottom:1px solid #f1f5f9">
-            <div style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;
-                        justify-content:center;font-family:'Baloo 2',sans-serif;font-weight:800;
+        <div class="student-list-item">
+            <div class="student-metric" style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;
+                        justify-content:center;
                         background:{{ '#dcfce7' if pct >= 80 else '#fef9c3' if pct >= 50 else '#fee2e2' }};
                         color:{{ '#16a34a' if pct >= 80 else '#ca8a04' if pct >= 50 else '#dc2626' }}">
                 {{ pct }}%
@@ -111,14 +110,14 @@
                 <div style="font-weight:700">{{ r.topic_name }}</div>
                 <div class="small text-muted">{{ r.subject_name }} · {{ r.attempted_at.strftime('%d %b %Y') }}</div>
             </div>
-            <div style="font-family:'Baloo 2',sans-serif;font-weight:800">
+            <div class="student-metric">
                 {{ r.score }}/{{ r.total_questions }}
             </div>
         </div>
         {% endfor %}
     </div>
     {% else %}
-    <div class="text-center py-4 text-muted">
+    <div class="student-empty-state">
         <i class="fa-solid fa-chart-line fa-2x mb-2"></i>
         <p>No quizzes taken yet. Start quizzing to track progress!</p>
         <a href="{{ url_for('student_dashboard') }}" class="btn-primary-ms">Start Quiz</a>

@@ -2,17 +2,16 @@
 {% block title %}Admin Dashboard - MindSprouts{% endblock %}
 
 {% block content %}
-<div class="page-header">
+<div class="page-header admin-header">
     <div class="container">
         <h1><i class="fa-solid fa-gauge"></i> Admin Dashboard</h1>
         <p class="mb-0 opacity-75">Welcome, {{ session.display_name }}!</p>
     </div>
 </div>
 
-<div class="container">
+<div class="container admin-grid-page">
 
-    <!-- Stat Cards -->
-    <div class="row g-4 mb-4">
+    <div class="row g-2 mb-3">
         <div class="col-md-4">
             <div class="stat-card">
                 <div class="stat-icon" style="background:#eef2ff">
@@ -59,13 +58,19 @@
         </div>
     </div>
 
-    <!-- Quick Links -->
-    <div class="row g-3 mb-5">
+    <div class="row g-2 mb-3">
         <div class="col-md-4">
             <a href="{{ url_for('manage_questions') }}"
                class="btn-primary-ms w-100 justify-content-center">
                 <i class="fa-solid fa-circle-question"></i>
                 Manage Questions
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="{{ url_for('manage_topics') }}"
+               class="btn-outline-ms w-100 justify-content-center">
+                <i class="fa-solid fa-layer-group"></i>
+                Manage Topics
             </a>
         </div>
         <div class="col-md-4">
@@ -84,6 +89,18 @@
             </a>
         </div>
         {% endif %}
+    </div>
+
+    <div class="admin-panel mb-3">
+        <h5 class="admin-section-head"><i class="fa-solid fa-stopwatch"></i> Total Quiz Duration</h5>
+        <form action="{{ url_for('update_quiz_duration') }}" method="POST" class="d-flex gap-2 align-items-center flex-wrap">
+            <input type="number" min="1" max="180" step="1" name="quiz_duration_minutes"
+                   value="{{ quiz_duration_minutes }}" class="form-control" style="max-width:220px" required>
+            <span class="small text-muted">minutes</span>
+            <button type="submit" class="btn-primary-ms">
+                <i class="fa-solid fa-check"></i> Update
+            </button>
+        </form>
     </div>
 
     <!-- Recent Results -->

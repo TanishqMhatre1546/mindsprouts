@@ -6,10 +6,11 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-    font-family: 'Nunito', sans-serif;
-    background: #f0f4ff;
+    font-family: 'Quicksand', 'Nunito', sans-serif;
+    background: #FFFDF9;
     color: #2d3748;
     min-height: 100vh;
+    line-height: 1.5;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -39,7 +40,7 @@ img { max-width: 100%; }
 
 .nav-link {
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 1rem;
     color: #4b5563 !important;
     border-radius: 10px;
     padding: 7px 12px !important;
@@ -48,6 +49,7 @@ img { max-width: 100%; }
     align-items: center;
     gap: 6px;
 }
+.nav-link i { font-size: 1.1rem; }
 .nav-link:hover {
     background: #eef2ff;
     color: #6366f1 !important;
@@ -129,7 +131,7 @@ img { max-width: 100%; }
         border: 1px solid #e2e8f0;
     }
     .nav-link {
-        padding: 10px 14px !important;
+        padding: 12px 14px !important;
         border-radius: 10px;
         margin-bottom: 2px;
         font-size: 0.95rem;
@@ -149,10 +151,27 @@ img { max-width: 100%; }
     }
 }
 
+@media (max-width: 576px) {
+    .navbar {
+        padding: 6px 0;
+    }
+    .navbar-brand {
+        font-size: 1.25rem;
+    }
+    .nav-link {
+        min-height: 44px;
+        font-size: 1rem;
+    }
+    .nav-link i {
+        width: 18px;
+        text-align: center;
+    }
+}
+
 /* ── PAGE HEADER ──────────────────────────────────── */
 .page-header {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-    color: white;
+    background: #A1D6E2;
+    color: #1e293b;
     padding: 32px 0 28px;
     margin-bottom: 32px;
 }
@@ -161,9 +180,13 @@ img { max-width: 100%; }
     font-weight: 800;
     margin-bottom: 4px;
 }
+.page-header .opacity-75 {
+    line-height: 1.5;
+}
 @media (max-width: 576px) {
     .page-header { padding: 24px 0 20px; margin-bottom: 24px; }
     .page-header h1 { font-size: 1.5rem; }
+    .page-header p { font-size: 0.95rem; }
 }
 
 /* ── SUBJECT CARDS ────────────────────────────────── */
@@ -174,7 +197,7 @@ img { max-width: 100%; }
     transition: transform 0.25s, box-shadow 0.25s;
     overflow: hidden;
     text-decoration: none;
-    color: inherit;
+    color: #1e293b;
     display: block;
     height: 100%;
 }
@@ -206,23 +229,34 @@ img { max-width: 100%; }
 }
 
 .subject-blue   { background: #dbeafe; }
-.subject-blue   .subject-icon-box { background: #3b82f6; color: white; }
-.subject-green  { background: #dcfce7; }
-.subject-green  .subject-icon-box { background: #22c55e; color: white; }
-.subject-yellow { background: #fef9c3; }
-.subject-yellow .subject-icon-box { background: #eab308; color: white; }
-.subject-pink   { background: #fce7f3; }
-.subject-pink   .subject-icon-box { background: #ec4899; color: white; }
+.subject-blue,
+.subject-green,
+.subject-yellow,
+.subject-pink { background: #A1D6E2; }
+.subject-blue .subject-icon-box,
+.subject-green .subject-icon-box,
+.subject-yellow .subject-icon-box,
+.subject-pink .subject-icon-box { background: #FF9F1C; color: #ffffff; }
 
 @media (max-width: 576px) {
     .subject-card .card-body { padding: 18px 12px; }
     .subject-icon-box { width: 56px; height: 56px; font-size: 1.4rem; margin-bottom: 10px; }
     .subject-card h5 { font-size: 0.95rem; }
+    .topic-card {
+        padding: 14px 14px;
+        border-radius: 14px;
+        gap: 10px;
+    }
+    .topic-num {
+        width: 34px;
+        height: 34px;
+        font-size: 0.85rem;
+    }
 }
 
 /* ── STAT CARDS ───────────────────────────────────── */
 .stat-card {
-    background: white;
+    background: #A1D6E2;
     border-radius: 18px;
     padding: 20px;
     box-shadow: 0 2px 12px rgba(0,0,0,0.05);
@@ -256,7 +290,7 @@ img { max-width: 100%; }
 
 /* ── TOPIC CARDS ──────────────────────────────────── */
 .topic-card {
-    background: white;
+    background: #A1D6E2;
     border: none;
     border-radius: 16px;
     padding: 18px 20px;
@@ -295,7 +329,7 @@ img { max-width: 100%; }
 
 /* ── QUIZ CARD ────────────────────────────────────── */
 .quiz-card {
-    background: white;
+    background: #A1D6E2;
     border-radius: 20px;
     padding: 32px;
     box-shadow: 0 4px 24px rgba(99,102,241,0.09);
@@ -376,7 +410,7 @@ img { max-width: 100%; }
 .quiz-progress-fill {
     height: 100%;
     border-radius: 8px;
-    background: linear-gradient(90deg, #6366f1, #8b5cf6);
+    background: linear-gradient(90deg, #FF9F1C, #ffb347);
     transition: width 0.4s ease;
 }
 
@@ -475,7 +509,7 @@ img { max-width: 100%; }
 
 /* ── LEADERBOARD ──────────────────────────────────── */
 .leaderboard-row {
-    background: white;
+    background: #A1D6E2;
     border-radius: 14px;
     padding: 14px 20px;
     margin-bottom: 10px;
@@ -556,7 +590,7 @@ img { max-width: 100%; }
     width: 72px;
     height: 72px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    background: #FF9F1C;
     color: white;
     font-family: 'Baloo 2', sans-serif;
     font-weight: 800;
@@ -566,9 +600,67 @@ img { max-width: 100%; }
     justify-content: center;
 }
 
+/* ── STUDENT VISUAL POLISH ───────────────────────── */
+.student-surface {
+    background: #A1D6E2;
+    border-radius: 20px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+}
+.student-heading {
+    font-family: 'Quicksand', sans-serif;
+    font-weight: 700;
+    line-height: 1.5;
+}
+.student-metric {
+    font-family: 'Quicksand', sans-serif;
+    font-weight: 700;
+}
+.student-list-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+}
+.student-list-item:last-child {
+    border-bottom: none;
+}
+.student-empty-state {
+    text-align: center;
+    padding: 36px 20px;
+    color: #64748b;
+}
+@media (max-width: 576px) {
+    .student-surface {
+        border-radius: 16px;
+    }
+    .student-list-item {
+        gap: 10px;
+        padding: 12px 12px;
+    }
+    .student-heading {
+        font-size: 1rem;
+    }
+    .student-metric {
+        font-size: 0.95rem;
+    }
+    .result-card {
+        padding: 24px 14px;
+        border-radius: 16px;
+    }
+    .score-circle {
+        width: 92px;
+        height: 92px;
+        margin-bottom: 14px;
+    }
+    .score-stat-num {
+        font-size: 1.4rem;
+    }
+}
+
 /* ── BUTTONS ──────────────────────────────────────── */
 .btn-primary-ms {
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    background: #FF9F1C;
     color: white;
     border: none;
     border-radius: 14px;
@@ -585,13 +677,13 @@ img { max-width: 100%; }
 }
 .btn-primary-ms:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(99,102,241,0.35);
+    box-shadow: 0 6px 20px rgba(255,159,28,0.35);
     color: white;
 }
 .btn-outline-ms {
     background: white;
-    color: #6366f1;
-    border: 2px solid #6366f1;
+    color: #1d4ed8;
+    border: 2px solid #1d4ed8;
     border-radius: 14px;
     padding: 9px 24px;
     font-family: 'Baloo 2', sans-serif;
@@ -605,8 +697,146 @@ img { max-width: 100%; }
     gap: 7px;
 }
 .btn-outline-ms:hover {
-    background: #6366f1;
+    background: #1d4ed8;
     color: white;
+}
+@media (max-width: 576px) {
+    .btn-primary-ms,
+    .btn-outline-ms {
+        min-height: 44px;
+        padding: 10px 16px;
+        justify-content: center;
+    }
+}
+
+/* ── GLOBAL QUIZ TIMER ────────────────────────────── */
+.quiz-global-timer-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+.timer-circle {
+    width: 110px;
+    height: 110px;
+    border-radius: 999px;
+    background: #ffffff;
+    border: 4px solid #A1D6E2;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    font-family: 'Quicksand', sans-serif;
+    font-weight: 700;
+    color: #1e293b;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+.timer-circle i {
+    font-size: 0.95rem;
+    color: #1d4ed8;
+}
+.timer-progress-track {
+    width: min(420px, 90vw);
+    height: 10px;
+    border-radius: 999px;
+    background: #e2e8f0;
+    overflow: hidden;
+}
+.timer-progress-fill {
+    height: 100%;
+    width: 100%;
+    transition: width 0.4s ease, background-color 0.3s ease;
+}
+.timer-green { background: #16a34a; }
+.timer-yellow { background: #eab308; }
+.timer-red { background: #dc2626; }
+.pulse-ring { animation: pulse 1.2s ease infinite; }
+@media (max-width: 576px) {
+    .quiz-global-timer-wrap {
+        margin-bottom: 10px;
+    }
+    .timer-circle {
+        width: 88px;
+        height: 88px;
+        border-width: 3px;
+    }
+    .timer-circle i {
+        font-size: 0.85rem;
+    }
+    .timer-circle #timer-num {
+        font-size: 0.9rem;
+    }
+    .timer-progress-track {
+        height: 8px;
+        width: 100%;
+    }
+}
+
+/* ── TIME UP CARD ─────────────────────────────────── */
+.timeup-overlay-card {
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 32px;
+    text-align: center;
+    box-shadow: 0 10px 32px rgba(15, 23, 42, 0.08);
+}
+.timeup-icon-wrap {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 14px;
+    border-radius: 999px;
+    background: #fee2e2;
+    color: #b91c1c;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+}
+.timeup-title {
+    font-family: 'Quicksand', sans-serif;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+.timeup-message { max-width: 520px; margin: 0 auto 8px; }
+
+/* ── ADMIN BENTO ──────────────────────────────────── */
+.admin-grid-page {
+    color: #334155;
+}
+.admin-header {
+    background: #ffffff;
+    color: #334155;
+    border-bottom: 1px solid #e2e8f0;
+}
+.admin-header h1,
+.admin-title,
+.admin-section-head {
+    line-height: 1.2;
+}
+.admin-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 8px;
+}
+.admin-panel {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 16px;
+}
+.bento-hero { grid-column: span 8; }
+.bento-duration { grid-column: span 4; }
+.bento-add { grid-column: span 5; }
+.bento-table { grid-column: span 7; }
+.admin-section-head {
+    color: #1d4ed8;
+    margin-bottom: 8px;
+    font-size: 1rem;
+    font-weight: 700;
+    font-family: 'Quicksand', sans-serif;
+}
+@media (max-width: 991px) {
+    .bento-hero, .bento-duration, .bento-add, .bento-table { grid-column: span 12; }
 }
 
 /* ── MOBILE TABLE FIX ─────────────────────────────── */

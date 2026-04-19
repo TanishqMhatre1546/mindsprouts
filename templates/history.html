@@ -24,7 +24,7 @@
                 {% endif %}
             </div>
             <div class="flex-grow-1">
-                <div style="font-family:'Baloo 2',sans-serif;font-weight:700">
+                <div class="student-heading">
                     {{ r.topic_name }}
                 </div>
                 <div class="small text-muted">
@@ -32,7 +32,7 @@
                 </div>
             </div>
             <div class="text-end">
-                <div style="font-family:'Baloo 2',sans-serif;font-weight:800;font-size:1.1rem">
+                <div class="student-metric" style="font-size:1.1rem">
                     {{ r.score }}/{{ r.total_questions }}
                 </div>
                 <div class="small" style="color:{{ '#16a34a' if pct >= 80 else '#f59e0b' if pct >= 50 else '#ef4444' }}">
@@ -42,7 +42,7 @@
         </div>
         {% endfor %}
     {% else %}
-        <div class="text-center py-5">
+        <div class="student-empty-state">
             <i class="fa-solid fa-clipboard-list fa-3x text-muted mb-3"></i>
             <h4>No quizzes yet!</h4>
             <p class="text-muted">Take your first quiz to see your history here.</p>

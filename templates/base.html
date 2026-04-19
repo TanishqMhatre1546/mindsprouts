@@ -6,7 +6,7 @@
     <title>{% block title %}MindSprouts{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700;800&family=Nunito:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700;800&family=Nunito:wght@400;500;600;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
     {% block extra_css %}{% endblock %}
 </head>
@@ -51,24 +51,10 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if request.endpoint == 'progress' %}nav-active{% endif %}"
-                       href="{{ url_for('progress') }}">
-                        <i class="fa-solid fa-chart-line"></i>
-                        <span>Progress</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if request.endpoint == 'history' %}nav-active{% endif %}"
+                    <a class="nav-link {% if request.endpoint in ['history', 'progress', 'leaderboard'] %}nav-active{% endif %}"
                        href="{{ url_for('history') }}">
-                        <i class="fa-solid fa-clock-rotate-left"></i>
-                        <span>History</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if request.endpoint == 'leaderboard' %}nav-active{% endif %}"
-                       href="{{ url_for('leaderboard') }}">
-                        <i class="fa-solid fa-trophy"></i>
-                        <span>Leaderboard</span>
+                        <i class="fa-solid fa-square-poll-vertical"></i>
+                        <span>Results</span>
                     </a>
                 </li>
                 <li class="nav-item">
@@ -76,14 +62,6 @@
                        href="{{ url_for('profile') }}">
                         <i class="fa-solid fa-user"></i>
                         <span>Profile</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link timer-link"
-                       href="{{ url_for('toggle_timer') }}">
-                        <i class="fa-solid fa-stopwatch"
-                           style="color:{{ '#22c55e' if session.timer_enabled else '#94a3b8' }}"></i>
-                        <span>Timer {{ 'ON' if session.timer_enabled else 'OFF' }}</span>
                     </a>
                 </li>
                 <li class="nav-item d-none d-lg-block">
@@ -113,6 +91,13 @@
                        href="{{ url_for('manage_questions') }}">
                         <i class="fa-solid fa-circle-question"></i>
                         <span>Questions</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'manage_topics' %}nav-active{% endif %}"
+                       href="{{ url_for('manage_topics') }}">
+                        <i class="fa-solid fa-layer-group"></i>
+                        <span>Topics</span>
                     </a>
                 </li>
                 <li class="nav-item">

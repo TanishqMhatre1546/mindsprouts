@@ -14,12 +14,11 @@
 
         <!-- Profile Card -->
         <div class="col-md-4">
-            <div style="background:white;border-radius:24px;padding:32px;
-                        text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.07)">
+            <div class="student-surface" style="border-radius:24px;padding:32px;text-align:center">
                 <div class="avatar-circle mx-auto mb-3">
                     {{ session.display_name[0].upper() }}
                 </div>
-                <h4 style="font-family:'Baloo 2',sans-serif;font-weight:800">
+                <h4 class="student-heading">
                     {{ session.display_name }}
                 </h4>
                 <p class="text-muted mb-1">@{{ student.username }}</p>
@@ -32,22 +31,19 @@
 
                 <div class="d-flex justify-content-around">
                     <div class="text-center">
-                        <div style="font-family:'Baloo 2',sans-serif;font-weight:800;
-                                    font-size:1.5rem;color:#6366f1">
+                        <div class="student-metric" style="font-size:1.5rem;color:#6366f1">
                             {{ student.total_points }}
                         </div>
                         <div class="small text-muted">Points</div>
                     </div>
                     <div class="text-center">
-                        <div style="font-family:'Baloo 2',sans-serif;font-weight:800;
-                                    font-size:1.5rem;color:#ea580c">
+                        <div class="student-metric" style="font-size:1.5rem;color:#ea580c">
                             {{ student.current_streak }}
                         </div>
                         <div class="small text-muted">Streak</div>
                     </div>
                     <div class="text-center">
-                        <div style="font-family:'Baloo 2',sans-serif;font-weight:800;
-                                    font-size:1.5rem;color:#16a34a">
+                        <div class="student-metric" style="font-size:1.5rem;color:#16a34a">
                             {{ total_quizzes }}
                         </div>
                         <div class="small text-muted">Quizzes</div>
@@ -73,9 +69,8 @@
         <div class="col-md-8">
 
             <!-- Subject Stats -->
-            <div style="background:white;border-radius:20px;padding:24px;
-                        box-shadow:0 4px 16px rgba(0,0,0,0.06);margin-bottom:20px">
-                <h5 style="font-family:'Baloo 2',sans-serif;font-weight:700;margin-bottom:16px">
+            <div class="student-surface p-4 mb-3">
+                <h5 class="student-heading mb-3">
                     <i class="fa-solid fa-chart-pie"></i> Performance by Subject
                 </h5>
                 {% if subject_stats %}
@@ -105,9 +100,8 @@
             </div>
 
             <!-- Change Password -->
-            <div style="background:white;border-radius:20px;padding:24px;
-                        box-shadow:0 4px 16px rgba(0,0,0,0.06)">
-                <h5 style="font-family:'Baloo 2',sans-serif;font-weight:700;margin-bottom:16px">
+            <div class="student-surface p-4">
+                <h5 class="student-heading mb-3">
                     <i class="fa-solid fa-lock"></i> Change Password
                 </h5>
                 <form action="{{ url_for('change_password') }}" method="POST">

@@ -5,8 +5,16 @@ document.addEventListener('DOMContentLoaded', function () {
     let current        = 0;
     let timerInterval  = null;
     let isSubmitting   = false;
-    const TIMER_SEC = 30;
     const timerEnabled = document.getElementById('timer-display') !== null;
+    const timerDisplay = document.getElementById('timer-display');
+    const timerNum = document.getElementById('timer-num');
+    const timerProgress = document.getElementById('timer-progress-fill');
+    const totalTimerSec = timerDisplay ? parseInt(timerDisplay.dataset.totalTime || '0', 10) : 0;
+    const serverRemainingSec = timerDisplay ? parseInt(timerDisplay.dataset.remainingTime || '0', 10) : 0;
+    const failedUrl = timerDisplay ? timerDisplay.dataset.failedUrl : '';
+    const quizTokenInput = document.querySelector('input[name="quiz_attempt_token"]');
+    const quizToken = quizTokenInput ? quizTokenInput.value : '';
+    const localTimerKey = quizToken ? `mindsprouts_quiz_started_at_${quizToken}` : null;
 
     if (questions.length > 0) showQuestion(0);
 
@@ -28,22 +36,54 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function startTimer() {
         clearInterval(timerInterval);
-        let timeLeft   = TIMER_SEC;
-        const numEl    = document.getElementById('timer-num');
-        const timerBox = document.getElementById('timer-display');
-        if (numEl) numEl.textContent = timeLeft;
-        if (timerBox) {
-            timerBox.classList.remove('danger');
+        if (!timerDisplay || !timerNum || totalTimerSec <= 0) return;
+        let syncedStart = Math.floor(Date.now() / 1000) - Math.max(0, totalTimerSec - serverRemainingSec);
+        if (localTimerKey) {
+            const savedStart = parseInt(localStorage.getItem(localTimerKey) || '0', 10);
+            if (savedStart > 0) {
+                syncedStart = savedStart;
+            } else {
+                localStorage.setItem(localTimerKey, String(syncedStart));
+            }
         }
-        timerInterval = setInterval(function () {
-            timeLeft--;
-            if (numEl) numEl.textContent = timeLeft;
-            if (timeLeft <= 5 && timerBox) timerBox.classList.add('danger');
+
+        function updateTimerFrame() {
+            const nowSec = Math.floor(Date.now() / 1000);
+            const elapsed = Math.max(0, nowSec - syncedStart);
+            const timeLeft = Math.max(0, totalTimerSec - elapsed);
+            const minutes = String(Math.floor(timeLeft / 60)).padStart(2, '0');
+            const seconds = String(timeLeft % 60).padStart(2, '0');
+            timerNum.textContent = `${minutes}:${seconds}`;
+            const ratio = totalTimerSec > 0 ? (timeLeft / totalTimerSec) : 0;
+            if (timerProgress) {
+                timerProgress.style.width = `${Math.max(0, Math.min(100, ratio * 100))}%`;
+                timerProgress.classList.remove('timer-green', 'timer-yellow', 'timer-red');
+                if (ratio > 0.5) timerProgress.classList.add('timer-green');
+                else if (ratio >= 0.2) timerProgress.classList.add('timer-yellow');
+                else timerProgress.classList.add('timer-red');
+            }
+            timerDisplay.classList.toggle('danger', ratio < 0.2);
+
             if (timeLeft <= 0) {
                 clearInterval(timerInterval);
-                moveNext();
+                if (localTimerKey) localStorage.removeItem(localTimerKey);
+                disableQuizAndFail();
             }
+        }
+
+        updateTimerFrame();
+        timerInterval = setInterval(function () {
+            updateTimerFrame();
         }, 1000);
+    }
+
+    function disableQuizAndFail() {
+        document.querySelectorAll('.option-btn, .next-btn, .prev-btn').forEach(btn => {
+            btn.disabled = true;
+        });
+        if (failedUrl) {
+            window.location.href = failedUrl;
+        }
     }
 
     function moveNext() {
@@ -114,6 +154,13 @@ document.addEventListener('DOMContentLoaded', function () {
             movePrev();
         });
     });
+
+    const quizFormEl = document.getElementById('quiz-form');
+    if (quizFormEl) {
+        quizFormEl.addEventListener('submit', function () {
+            if (localTimerKey) localStorage.removeItem(localTimerKey);
+        });
+    }
 
     // Add password visibility toggles across all forms
     document.querySelectorAll('input[type="password"]').forEach(input => {

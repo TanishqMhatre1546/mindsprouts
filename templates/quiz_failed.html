@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}Time's Up - MindSprouts{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width:700px">
+    <div class="timeup-overlay-card pop-in">
+        <div class="timeup-icon-wrap">
+            <i class="fa-solid fa-clock"></i>
+        </div>
+        <h2 class="timeup-title">Time's Up!</h2>
+        <p class="timeup-message">
+            Oops! The clock caught us. Let's try again to beat your score!
+        </p>
+        <p class="small text-muted mb-4">{{ topic_name }} was marked as failed for this attempt.</p>
+        <div class="d-flex justify-content-center gap-2 flex-wrap">
+            <a href="{{ url_for('quiz', topic_id=session.quiz_topic_id) }}" class="btn-primary-ms">
+                <i class="fa-solid fa-rotate-right"></i> Restart
+            </a>
+            <a href="{{ url_for('student_dashboard') }}" class="btn-outline-ms">
+                <i class="fa-solid fa-house"></i> Back to Home
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

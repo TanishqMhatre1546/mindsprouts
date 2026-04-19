@@ -7,6 +7,10 @@ from datetime import date
 import os
 import logging
 import uuid
+import time
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 # In production, set SECRET_KEY as an environment variable.
@@ -21,6 +25,24 @@ logging.basicConfig(
     format='%(asctime)s %(levelname)s %(message)s'
 )
 app.logger.setLevel(os.environ.get('LOG_LEVEL', 'INFO').upper())
+
+DEFAULT_QUIZ_DURATION_MINUTES = 5
+
+
+def initialize_quiz_timer(duration_minutes):
+    total_time_sec = max(1, int(duration_minutes)) * 60
+    session['quiz_total_time_sec'] = total_time_sec
+    session['quiz_started_at'] = int(time.time())
+    session['quiz_failed'] = False
+
+
+def get_remaining_quiz_seconds():
+    started_at = session.get('quiz_started_at')
+    total_time_sec = session.get('quiz_total_time_sec')
+    if not started_at or not total_time_sec:
+        return None
+    elapsed = max(0, int(time.time()) - int(started_at))
+    return max(0, int(total_time_sec) - elapsed)
 
 def get_db():
     # Prefer Render's DATABASE_URL if available.
@@ -62,6 +84,41 @@ def get_db():
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
+
+def ensure_app_settings_table(conn):
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    cur.close()
+
+def get_quiz_duration_minutes(conn):
+    ensure_app_settings_table(conn)
+    cur = conn.cursor()
+    cur.execute("SELECT value FROM app_settings WHERE key = %s", ('quiz_duration_minutes',))
+    row = cur.fetchone()
+    if row and row.get('value'):
+        try:
+            return max(1, int(row['value']))
+        except (ValueError, TypeError):
+            return DEFAULT_QUIZ_DURATION_MINUTES
+    return DEFAULT_QUIZ_DURATION_MINUTES
+
+def set_quiz_duration_minutes(conn, minutes):
+    ensure_app_settings_table(conn)
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO app_settings (key, value)
+        VALUES (%s, %s)
+        ON CONFLICT (key)
+        DO UPDATE SET value = EXCLUDED.value
+    """, ('quiz_duration_minutes', str(minutes)))
+    conn.commit()
+    cur.close()
 
 def student_required(f):
     from functools import wraps
@@ -262,9 +319,28 @@ def quiz(topic_id):
         WHERE t.topic_id = %s
     """, (topic_id,))
     subj = cur.fetchone()
+    quiz_duration_minutes = get_quiz_duration_minutes(conn)
     cur.close(); conn.close()
     session['quiz_subject_name'] = subj['subject_name']
-    return render_template('quiz.html', questions=questions, topic=topic)
+    initialize_quiz_timer(quiz_duration_minutes)
+    return render_template(
+        'quiz.html',
+        questions=questions,
+        topic=topic,
+        quiz_duration_minutes=quiz_duration_minutes,
+        total_time_sec=session.get('quiz_total_time_sec', quiz_duration_minutes * 60),
+        remaining_time_sec=get_remaining_quiz_seconds()
+    )
+
+
+@app.route('/quiz/failed')
+@student_required
+def quiz_failed():
+    if not session.get('quiz_topic_id'):
+        flash('No active quiz found. Start a topic to continue.', 'warning')
+        return redirect(url_for('student_dashboard'))
+    session['quiz_failed'] = True
+    return render_template('quiz_failed.html', topic_name=session.get('quiz_topic_name', 'Quiz'))
 
 @app.route('/submit_quiz', methods=['POST'])
 @student_required
@@ -283,6 +359,12 @@ def submit_quiz():
     if not submitted_token or submitted_token != active_token:
         flash('Invalid or expired quiz submission. Please retake the quiz.', 'warning')
         return redirect(url_for('student_dashboard'))
+    if session.get('quiz_failed'):
+        return redirect(url_for('quiz_failed'))
+    remaining_time_sec = get_remaining_quiz_seconds()
+    if remaining_time_sec is not None and remaining_time_sec <= 0:
+        session['quiz_failed'] = True
+        return redirect(url_for('quiz_failed'))
     session['quiz_submitted'] = True
     conn = get_db()
     cur  = conn.cursor()
@@ -345,6 +427,9 @@ def submit_quiz():
     session['total_points']   = session.get('total_points', 0) + points_earned
     session['current_streak'] = current_streak
     session['longest_streak'] = longest_streak
+    session.pop('quiz_total_time_sec', None)
+    session.pop('quiz_started_at', None)
+    session.pop('quiz_failed', None)
     return render_template('result.html',
         score=score, total=total,
         points_earned=points_earned,
@@ -484,12 +569,32 @@ def admin_dashboard():
     total_results = cur.fetchone()['total']
     cur.execute("SELECT * FROM results ORDER BY attempted_at DESC LIMIT 10")
     recent = cur.fetchall()
+    quiz_duration_minutes = get_quiz_duration_minutes(conn)
     cur.close(); conn.close()
     return render_template('admin_dash.html',
         total_students=total_students,
         total_questions=total_questions,
         total_results=total_results,
-        recent=recent)
+        recent=recent,
+        quiz_duration_minutes=quiz_duration_minutes)
+
+@app.route('/admin/quiz-duration', methods=['POST'])
+@admin_required
+def update_quiz_duration():
+    raw_minutes = request.form.get('quiz_duration_minutes', '').strip()
+    try:
+        minutes = int(raw_minutes)
+    except ValueError:
+        flash('Please enter a valid duration in minutes.', 'danger')
+        return redirect(url_for('admin_dashboard'))
+    if minutes < 1 or minutes > 180:
+        flash('Quiz duration must be between 1 and 180 minutes.', 'danger')
+        return redirect(url_for('admin_dashboard'))
+    conn = get_db()
+    set_quiz_duration_minutes(conn, minutes)
+    conn.close()
+    flash('Quiz duration updated successfully.', 'success')
+    return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/questions')
 @admin_required
@@ -512,6 +617,87 @@ def manage_questions():
     topics = cur.fetchall()
     cur.close(); conn.close()
     return render_template('manage_questions.html', questions=questions, topics=topics)
+
+@app.route('/admin/topics')
+@admin_required
+def manage_topics():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM subjects ORDER BY subject_name")
+    subjects = cur.fetchall()
+    quiz_duration_minutes = get_quiz_duration_minutes(conn)
+    cur.execute("""
+        SELECT t.*, s.subject_name
+        FROM topics t
+        JOIN subjects s ON t.subject_id = s.subject_id
+        ORDER BY t.grade, s.subject_name, t.topic_name
+    """)
+    topics = cur.fetchall()
+    cur.close(); conn.close()
+    return render_template(
+        'manage_topics.html',
+        topics=topics,
+        subjects=subjects,
+        quiz_duration_minutes=quiz_duration_minutes
+    )
+
+@app.route('/admin/topics/add', methods=['POST'])
+@admin_required
+def add_topic():
+    topic_name = request.form.get('topic_name', '').strip()
+    subject_id = request.form.get('subject_id', '').strip()
+    grade = request.form.get('grade', '').strip()
+    if not topic_name or not subject_id or not grade:
+        flash('Topic name, subject, and grade are required.', 'danger')
+        return redirect(url_for('manage_topics'))
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO topics (topic_name, subject_id, grade)
+        VALUES (%s, %s, %s)
+    """, (topic_name, subject_id, grade))
+    conn.commit()
+    cur.close(); conn.close()
+    flash('Topic added successfully.', 'success')
+    return redirect(url_for('manage_topics'))
+
+@app.route('/admin/topics/edit/<int:topic_id>', methods=['POST'])
+@admin_required
+def edit_topic(topic_id):
+    topic_name = request.form.get('topic_name', '').strip()
+    subject_id = request.form.get('subject_id', '').strip()
+    grade = request.form.get('grade', '').strip()
+    if not topic_name or not subject_id or not grade:
+        flash('Topic name, subject, and grade are required.', 'danger')
+        return redirect(url_for('manage_topics'))
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE topics
+        SET topic_name = %s, subject_id = %s, grade = %s
+        WHERE topic_id = %s
+    """, (topic_name, subject_id, grade, topic_id))
+    conn.commit()
+    cur.close(); conn.close()
+    flash('Topic updated successfully.', 'success')
+    return redirect(url_for('manage_topics'))
+
+@app.route('/admin/topics/delete/<int:topic_id>')
+@admin_required
+def delete_topic(topic_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) AS total FROM questions WHERE topic_id = %s", (topic_id,))
+    question_count = cur.fetchone()['total']
+    if question_count > 0:
+        cur.close(); conn.close()
+        flash('Cannot delete this topic because it still has questions.', 'danger')
+        return redirect(url_for('manage_topics'))
+    cur.execute("DELETE FROM topics WHERE topic_id = %s", (topic_id,))
+    conn.commit()
+    cur.close(); conn.close()
+    flash('Topic deleted successfully.', 'success')
+    return redirect(url_for('manage_topics'))
 
 @app.route('/admin/questions/add', methods=['POST'])
 @admin_required
