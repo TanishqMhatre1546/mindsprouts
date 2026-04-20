@@ -9,7 +9,6 @@ import logging
 import uuid
 import time
 from dotenv import load_dotenv
-from game_routes import create_game_blueprint
 
 load_dotenv()
 
@@ -179,8 +178,6 @@ def super_admin_required(f):
     return decorated
 
 
-app.register_blueprint(create_game_blueprint(get_db, student_required))
-
 @app.before_request
 def log_request_start():
     app.logger.info("request_start method=%s path=%s", request.method, request.path)
@@ -312,27 +309,9 @@ def student_dashboard():
     return render_template('student_dash.html', subjects=subjects, total_quizzes=total_quizzes)
 
 
-@app.route('/subject/<int:subject_id>/mode')
-@student_required
-def subject_mode_page(subject_id):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM subjects WHERE subject_id = %s", (subject_id,))
-    subject = cur.fetchone()
-    if not subject:
-        cur.close(); conn.close()
-        flash('Subject not found.', 'danger')
-        return redirect(url_for('student_dashboard'))
-    cur.close(); conn.close()
-    return render_template('subject_mode.html', subject=subject)
-
-
 @app.route('/topics/<int:subject_id>')
 @student_required
 def topics(subject_id):
-    play_mode = request.args.get('mode', 'quiz').strip().lower()
-    if play_mode not in {'quiz', 'game'}:
-        play_mode = 'quiz'
     conn = get_db()
     cur  = conn.cursor()
     cur.execute("SELECT * FROM subjects WHERE subject_id = %s", (subject_id,))
@@ -344,47 +323,7 @@ def topics(subject_id):
     """, (session['student_id'], subject['subject_name']))
     attempted = [r['topic_name'] for r in cur.fetchall()]
     cur.close(); conn.close()
-    return render_template(
-        'topics.html',
-        subject=subject,
-        topics=topics,
-        attempted=attempted,
-        play_mode=play_mode
-    )
-
-
-@app.route('/topic/<int:topic_id>/mode')
-@student_required
-def topic_mode_page(topic_id):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM topics WHERE topic_id = %s", (topic_id,))
-    topic = cur.fetchone()
-    if not topic:
-        cur.close(); conn.close()
-        flash('Topic not found.', 'danger')
-        return redirect(url_for('student_dashboard'))
-    cur.execute("SELECT * FROM subjects WHERE subject_id = %s", (topic['subject_id'],))
-    subject = cur.fetchone()
-    cur.close(); conn.close()
-    return render_template('topic_mode.html', topic=topic, subject=subject)
-
-
-@app.route('/game/<int:topic_id>')
-@student_required
-def play_game(topic_id):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM topics WHERE topic_id = %s", (topic_id,))
-    topic = cur.fetchone()
-    if not topic:
-        cur.close(); conn.close()
-        flash('Topic not found.', 'danger')
-        return redirect(url_for('student_dashboard'))
-    cur.execute("SELECT * FROM subjects WHERE subject_id = %s", (topic['subject_id'],))
-    subject = cur.fetchone()
-    cur.close(); conn.close()
-    return render_template('game_play.html', topic=topic, subject=subject)
+    return render_template('topics.html', subject=subject, topics=topics, attempted=attempted)
 
 @app.route('/quiz/<int:topic_id>')
 @student_required

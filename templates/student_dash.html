@@ -51,7 +51,7 @@
         {% for subject in subjects %}
         <div class="col-6 col-md-3 fade-in"
              style="animation-delay:{{ loop.index0 * 0.1 }}s">
-            <a href="{{ url_for('subject_mode_page', subject_id=subject.subject_id) }}"
+            <a href="{{ url_for('topics', subject_id=subject.subject_id) }}"
                class="subject-card {{ subject.color_class }}">
                 <div class="card-body">
                     <div class="subject-icon-box">
