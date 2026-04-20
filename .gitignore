@@ -10,6 +10,7 @@ env/
 # Local environment files
 .env
 .env.*
+*.dump
 
 # IDE/OS
 .DS_Store
