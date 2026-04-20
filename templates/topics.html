@@ -4,7 +4,7 @@
 {% block content %}
 <div class="page-header">
     <div class="container">
-        <a href="{{ url_for('student_dashboard') }}" class="btn-back-header">
+        <a href="{{ url_for('subject_mode_page', subject_id=subject.subject_id) }}" class="btn-back-header">
     <i class="fa-solid fa-arrow-left"></i> Back
       </a>
         <div class="d-flex align-items-center gap-3">
@@ -16,7 +16,8 @@
                 <h1 class="mb-0">{{ subject.subject_name }}</h1>
                 <p class="mb-0 opacity-75">
                     Grade {{ session.grade }} —
-                    {{ attempted|length }}/{{ topics|length }} topics attempted
+                    {{ attempted|length }}/{{ topics|length }} topics attempted ·
+                    {% if play_mode == 'game' %}Game path{% else %}Quiz path{% endif %}
                 </p>
             </div>
         </div>
@@ -45,7 +46,7 @@
     {% if topics %}
         {% for topic in topics %}
         {% set is_done = topic.topic_name in attempted %}
-        <a href="{{ url_for('topic_mode_page', topic_id=topic.topic_id) }}"
+        <a href="{% if play_mode == 'game' %}{{ url_for('play_game', topic_id=topic.topic_id) }}{% else %}{{ url_for('quiz', topic_id=topic.topic_id) }}{% endif %}"
            class="topic-card mb-3 fade-in"
            style="animation-delay:{{ loop.index0 * 0.07 }}s">
             <div class="topic-num {% if is_done %}topic-num-done{% endif %}">
@@ -64,9 +65,9 @@
                         <span style="color:#16a34a">
                             <i class="fa-solid fa-check-circle"></i> Attempted
                         </span>
-                        · 10 questions · +10 pts each
+                        · {% if play_mode == 'game' %}Game played{% else %}10 questions · +10 pts each{% endif %}
                     {% else %}
-                        10 questions · +10 pts each
+                        {% if play_mode == 'game' %}Start game level{% else %}10 questions · +10 pts each{% endif %}
                     {% endif %}
                 </div>
             </div>

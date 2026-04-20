@@ -311,9 +311,28 @@ def student_dashboard():
     cur.close(); conn.close()
     return render_template('student_dash.html', subjects=subjects, total_quizzes=total_quizzes)
 
+
+@app.route('/subject/<int:subject_id>/mode')
+@student_required
+def subject_mode_page(subject_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM subjects WHERE subject_id = %s", (subject_id,))
+    subject = cur.fetchone()
+    if not subject:
+        cur.close(); conn.close()
+        flash('Subject not found.', 'danger')
+        return redirect(url_for('student_dashboard'))
+    cur.close(); conn.close()
+    return render_template('subject_mode.html', subject=subject)
+
+
 @app.route('/topics/<int:subject_id>')
 @student_required
 def topics(subject_id):
+    play_mode = request.args.get('mode', 'quiz').strip().lower()
+    if play_mode not in {'quiz', 'game'}:
+        play_mode = 'quiz'
     conn = get_db()
     cur  = conn.cursor()
     cur.execute("SELECT * FROM subjects WHERE subject_id = %s", (subject_id,))
@@ -325,7 +344,13 @@ def topics(subject_id):
     """, (session['student_id'], subject['subject_name']))
     attempted = [r['topic_name'] for r in cur.fetchall()]
     cur.close(); conn.close()
-    return render_template('topics.html', subject=subject, topics=topics, attempted=attempted)
+    return render_template(
+        'topics.html',
+        subject=subject,
+        topics=topics,
+        attempted=attempted,
+        play_mode=play_mode
+    )
 
 
 @app.route('/topic/<int:topic_id>/mode')
