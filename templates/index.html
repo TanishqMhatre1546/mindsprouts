@@ -3,17 +3,22 @@
 
 {% block content %}
 <div class="login-page">
+    <!-- Decorative orbs -->
+    <div class="login-orb orb-1"></div>
+    <div class="login-orb orb-2"></div>
+    <div class="login-orb orb-3"></div>
+
     <div class="container">
         <div class="row justify-content-center align-items-center min-vh-100">
             <div class="col-lg-5 col-md-7">
 
                 <!-- Logo -->
-                <div class="text-center mb-4 fade-in">
+                <div class="text-center mb-5 fade-in">
                     <div class="login-logo">
                         <i class="fa-solid fa-seedling"></i>
                     </div>
                     <h1 class="login-title">MindSprouts</h1>
-                    <p class="login-subtitle">Learn. Play. Grow!</p>
+                    <p class="login-subtitle">Learn. Play. Grow! 🚀</p>
                 </div>
 
                 <!-- Tab Switcher -->
@@ -39,7 +44,7 @@
                         <div id="login-form">
                             <form action="{{ url_for('student_login') }}" method="POST">
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold">Username</label>
+                                    <label class="form-label">Username</label>
                                     <div class="input-group-ms">
                                         <i class="fa-solid fa-user"></i>
                                         <input type="text" name="username" class="ms-input"
@@ -47,7 +52,7 @@
                                     </div>
                                 </div>
                                 <div class="mb-4">
-                                    <label class="form-label fw-bold">Password</label>
+                                    <label class="form-label">Password</label>
                                     <div class="input-group-ms">
                                         <i class="fa-solid fa-lock"></i>
                                         <input type="password" name="password" class="ms-input"
@@ -64,7 +69,7 @@
                         <div id="signup-form" style="display:none">
                             <form action="{{ url_for('signup') }}" method="POST">
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold">Your Name</label>
+                                    <label class="form-label">Your Name</label>
                                     <div class="input-group-ms">
                                         <i class="fa-solid fa-face-smile"></i>
                                         <input type="text" name="display_name" class="ms-input"
@@ -72,7 +77,7 @@
                                     </div>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold">Username</label>
+                                    <label class="form-label">Username</label>
                                     <div class="input-group-ms">
                                         <i class="fa-solid fa-user"></i>
                                         <input type="text" name="username" class="ms-input"
@@ -80,7 +85,7 @@
                                     </div>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold">Password</label>
+                                    <label class="form-label">Password</label>
                                     <div class="input-group-ms">
                                         <i class="fa-solid fa-lock"></i>
                                         <input type="password" name="password" class="ms-input"
@@ -88,7 +93,7 @@
                                     </div>
                                 </div>
                                 <div class="mb-4">
-                                    <label class="form-label fw-bold">Your Grade</label>
+                                    <label class="form-label">Your Grade</label>
                                     <div class="input-group-ms">
                                         <i class="fa-solid fa-graduation-cap"></i>
                                         <select name="grade" class="ms-input" required>
@@ -112,7 +117,7 @@
                     <div id="admin-panel" style="display:none">
                         <form action="{{ url_for('admin_login') }}" method="POST">
                             <div class="mb-3">
-                                <label class="form-label fw-bold">Admin Username</label>
+                                <label class="form-label">Admin Username</label>
                                 <div class="input-group-ms">
                                     <i class="fa-solid fa-user-shield"></i>
                                     <input type="text" name="username" class="ms-input"
@@ -120,7 +125,7 @@
                                 </div>
                             </div>
                             <div class="mb-4">
-                                <label class="form-label fw-bold">Password</label>
+                                <label class="form-label">Password</label>
                                 <div class="input-group-ms">
                                     <i class="fa-solid fa-lock"></i>
                                     <input type="password" name="password" class="ms-input"
@@ -143,76 +148,144 @@
 {% block extra_css %}
 <style>
 .login-page {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--bg);
     min-height: 100vh;
+    position: relative;
+    overflow: hidden;
 }
+.login-orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 0;
+}
+.orb-1 {
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(124,92,252,0.25), transparent 70%);
+    top: -100px; left: -150px;
+    animation: floatOrb 8s ease-in-out infinite;
+}
+.orb-2 {
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(46,217,163,0.15), transparent 70%);
+    bottom: -80px; right: -100px;
+    animation: floatOrb 10s ease-in-out infinite reverse;
+}
+.orb-3 {
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, rgba(255,107,107,0.12), transparent 70%);
+    top: 40%; right: 20%;
+    animation: floatOrb 12s ease-in-out infinite 2s;
+}
+@keyframes floatOrb {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33%       { transform: translate(30px, -20px) scale(1.05); }
+    66%       { transform: translate(-20px, 30px) scale(0.95); }
+}
+.login-page .container { position: relative; z-index: 1; }
 .login-logo {
-    width: 80px; height: 80px;
-    background: white;
-    border-radius: 24px;
+    width: 88px; height: 88px;
+    background: linear-gradient(135deg, var(--violet), var(--violet-light));
+    border-radius: 26px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 2.2rem; color: #6366f1;
-    margin: 0 auto 16px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    font-size: 2.4rem; color: white;
+    margin: 0 auto 18px;
+    box-shadow: 0 0 40px var(--violet-glow), 0 8px 32px rgba(0,0,0,0.4);
+    animation: logoBounce 3s ease-in-out infinite;
+}
+@keyframes logoBounce {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(-8px); }
 }
 .login-title {
-    color: white; font-size: 2.4rem;
-    font-weight: 800; margin-bottom: 4px;
+    color: var(--text-main);
+    font-family: 'Fredoka One', sans-serif;
+    font-size: 2.8rem;
+    font-weight: 400;
+    margin-bottom: 4px;
+    text-shadow: 0 0 30px var(--violet-glow);
 }
-.login-subtitle { color: rgba(255,255,255,0.85); font-size: 1.1rem; }
+.login-subtitle { color: var(--text-muted); font-size: 1.1rem; font-weight: 600; }
 .login-card {
-    background: white;
-    border-radius: 24px;
-    padding: 32px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    background: var(--bg-card);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-xl);
+    padding: 34px;
+    box-shadow: var(--shadow-lg), 0 0 48px rgba(124,92,252,0.08);
+    backdrop-filter: blur(10px);
 }
 .tab-switcher {
     display: flex; gap: 8px;
-    background: #f1f5f9;
-    border-radius: 14px; padding: 6px;
+    background: var(--bg-surface);
+    border-radius: var(--r-md); padding: 6px;
     margin-bottom: 24px;
+    border: 1px solid var(--border);
 }
 .tab-btn {
     flex: 1; border: none; background: transparent;
-    border-radius: 10px; padding: 10px;
-    font-family: 'Baloo 2', sans-serif;
-    font-weight: 700; font-size: 0.95rem;
-    color: #64748b; cursor: pointer; transition: all 0.2s;
+    border-radius: var(--r-sm); padding: 10px;
+    font-family: 'Fredoka One', sans-serif;
+    font-size: 0.97rem;
+    color: var(--text-dim); cursor: pointer; transition: all 0.2s;
+    letter-spacing: 0.3px;
 }
 .tab-btn.active {
-    background: white; color: #6366f1;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    background: var(--bg-card-2);
+    color: var(--violet-light);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid rgba(124,92,252,0.3);
 }
 .form-toggle {
     display: flex; gap: 0;
-    border: 2px solid #e2e8f0;
-    border-radius: 12px; overflow: hidden;
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--r-md); overflow: hidden;
     margin-bottom: 24px;
 }
 .toggle-btn {
     flex: 1; border: none; background: transparent;
-    padding: 10px; font-family: 'Nunito', sans-serif;
-    font-weight: 700; color: #94a3b8; cursor: pointer; transition: all 0.2s;
+    padding: 10px; font-family: 'Fredoka One', sans-serif;
+    font-size: 0.97rem;
+    color: var(--text-dim); cursor: pointer; transition: all 0.2s;
+    letter-spacing: 0.2px;
 }
-.toggle-btn.active { background: #6366f1; color: white; }
+.toggle-btn.active {
+    background: linear-gradient(135deg, var(--violet), var(--violet-light));
+    color: white;
+    box-shadow: inset 0 0 16px rgba(255,255,255,0.05);
+}
 .input-group-ms {
     display: flex; align-items: center;
-    background: #f8faff; border: 2px solid #e2e8f0;
-    border-radius: 12px; padding: 0 16px;
-    transition: border-color 0.2s;
+    background: var(--bg-surface);
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--r-md); padding: 0 16px;
+    transition: border-color 0.2s, box-shadow 0.2s;
 }
-.input-group-ms:focus-within { border-color: #6366f1; }
-.input-group-ms i { color: #94a3b8; margin-right: 10px; font-size: 0.9rem; }
+.input-group-ms:focus-within {
+    border-color: var(--violet);
+    box-shadow: 0 0 0 3px rgba(124,92,252,0.15);
+}
+.input-group-ms i { color: var(--text-dim); margin-right: 10px; font-size: 0.9rem; }
 .ms-input {
     flex: 1; border: none; background: transparent;
     padding: 12px 0; font-family: 'Nunito', sans-serif;
-    font-size: 0.95rem; outline: none; color: #374151;
+    font-size: 0.95rem; outline: none; color: var(--text-main);
 }
-.ms-input::placeholder { color: #cbd5e1; }
+.ms-input::placeholder { color: var(--text-dim); }
+.ms-input option {
+    background: var(--bg-card-2);
+    color: var(--text-main);
+}
+.login-card .form-label {
+    color: var(--text-muted) !important;
+    font-weight: 700;
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+}
 @media (max-width: 576px) {
     .login-card { padding: 24px 18px; margin: 0 8px; }
-    .login-title { font-size: 2rem; }
-    .btn-primary-ms { padding: 13px 20px; font-size: 1rem; }
+    .login-title { font-size: 2.2rem; }
+    .login-logo  { width: 72px; height: 72px; font-size: 2rem; }
 }
 </style>
 {% endblock %}
