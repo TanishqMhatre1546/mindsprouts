@@ -9,6 +9,7 @@ import logging
 import uuid
 import time
 from dotenv import load_dotenv
+from game_routes import create_game_blueprint
 
 load_dotenv()
 
@@ -177,6 +178,9 @@ def super_admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
+
+app.register_blueprint(create_game_blueprint(get_db, student_required))
+
 @app.before_request
 def log_request_start():
     app.logger.info("request_start method=%s path=%s", request.method, request.path)
@@ -322,6 +326,40 @@ def topics(subject_id):
     attempted = [r['topic_name'] for r in cur.fetchall()]
     cur.close(); conn.close()
     return render_template('topics.html', subject=subject, topics=topics, attempted=attempted)
+
+
+@app.route('/topic/<int:topic_id>/mode')
+@student_required
+def topic_mode_page(topic_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM topics WHERE topic_id = %s", (topic_id,))
+    topic = cur.fetchone()
+    if not topic:
+        cur.close(); conn.close()
+        flash('Topic not found.', 'danger')
+        return redirect(url_for('student_dashboard'))
+    cur.execute("SELECT * FROM subjects WHERE subject_id = %s", (topic['subject_id'],))
+    subject = cur.fetchone()
+    cur.close(); conn.close()
+    return render_template('topic_mode.html', topic=topic, subject=subject)
+
+
+@app.route('/game/<int:topic_id>')
+@student_required
+def play_game(topic_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM topics WHERE topic_id = %s", (topic_id,))
+    topic = cur.fetchone()
+    if not topic:
+        cur.close(); conn.close()
+        flash('Topic not found.', 'danger')
+        return redirect(url_for('student_dashboard'))
+    cur.execute("SELECT * FROM subjects WHERE subject_id = %s", (topic['subject_id'],))
+    subject = cur.fetchone()
+    cur.close(); conn.close()
+    return render_template('game_play.html', topic=topic, subject=subject)
 
 @app.route('/quiz/<int:topic_id>')
 @student_required

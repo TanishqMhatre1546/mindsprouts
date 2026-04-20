@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %}Adventure Game - {{ topic.topic_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="container">
+        <a href="{{ url_for('topic_mode_page', topic_id=topic.topic_id) }}" class="btn-back-header">
+            <i class="fa-solid fa-arrow-left"></i> Back to Modes
+        </a>
+        <h1 class="mt-3 mb-0">{{ topic.topic_name }} Adventure</h1>
+        <p class="mb-0 opacity-75">{{ subject.subject_name }} · Grade {{ topic.grade }}</p>
+    </div>
+</div>
+
+<div class="container py-4" style="max-width:920px">
+    <div id="game-root"
+         class="quiz-card"
+         data-topic-id="{{ topic.topic_id }}"
+         data-mode-url="{{ url_for('game_routes.topic_mode', topic_id=topic.topic_id) }}"
+         data-submit-url="{{ url_for('game_routes.submit_game') }}">
+        <p class="mb-0 text-muted">Loading game...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/game_engine.js') }}"></script>
+{% endblock %}
