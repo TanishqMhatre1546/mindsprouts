@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 import psycopg2
 import psycopg2.extras
 import hashlib
@@ -8,6 +8,9 @@ import os
 import logging
 import uuid
 import time
+import json
+import re
+from urllib import request as urlrequest
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -27,6 +30,7 @@ logging.basicConfig(
 app.logger.setLevel(os.environ.get('LOG_LEVEL', 'INFO').upper())
 
 DEFAULT_QUIZ_DURATION_MINUTES = 5
+MAX_TUTOR_CHAT_CHARS = 400
 
 
 def initialize_quiz_timer(duration_minutes):
@@ -84,6 +88,177 @@ def get_db():
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
+
+
+def sanitize_child_prompt(text):
+    cleaned = (text or "").strip()
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned[:MAX_TUTOR_CHAT_CHARS]
+
+
+def ensure_ai_tutor_tables(conn):
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS ai_tutor_sessions (
+            tutor_session_id TEXT PRIMARY KEY,
+            quiz_attempt_id INTEGER NOT NULL,
+            student_id INTEGER,
+            subject_name TEXT,
+            topic_name TEXT,
+            score INTEGER NOT NULL,
+            total_questions INTEGER NOT NULL,
+            performance_summary TEXT NOT NULL,
+            pattern_summary TEXT NOT NULL,
+            misconception_summary TEXT NOT NULL,
+            study_plan_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+            context_json JSONB NOT NULL,
+            wrong_question_ids_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+            unlocked BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS ai_tutor_messages (
+            message_id BIGSERIAL PRIMARY KEY,
+            tutor_session_id TEXT NOT NULL REFERENCES ai_tutor_sessions(tutor_session_id) ON DELETE CASCADE,
+            role TEXT NOT NULL CHECK (role IN ('assistant', 'user')),
+            message_text TEXT NOT NULL,
+            meta_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS ai_tutor_redemptions (
+            redemption_id BIGSERIAL PRIMARY KEY,
+            tutor_session_id TEXT NOT NULL REFERENCES ai_tutor_sessions(tutor_session_id) ON DELETE CASCADE,
+            question_text TEXT NOT NULL,
+            answer_text TEXT NOT NULL,
+            student_answer TEXT,
+            is_correct BOOLEAN,
+            awarded_points INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    cur.close()
+
+
+def option_text_from_label(q, label):
+    if label == 'A':
+        return q.get('option_a', '')
+    if label == 'B':
+        return q.get('option_b', '')
+    if label == 'C':
+        return q.get('option_c', '')
+    if label == 'D':
+        return q.get('option_d', '')
+    return ''
+
+
+def generate_study_plan(topic_name):
+    base = [
+        f"{topic_name} basics",
+        f"{topic_name} practice",
+        f"Word problems with {topic_name.lower()}",
+    ]
+    if 'division' in topic_name.lower():
+        base = ['Multiplication facts', 'Long division', 'Sharing word problems']
+    elif 'fraction' in topic_name.lower():
+        base = ['Equivalent fractions', 'Adding fractions', 'Fraction story problems']
+    elif 'multiplication' in topic_name.lower():
+        base = ['Multiplication tables', 'Arrays and groups', 'Mixed operations']
+    return base[:3]
+
+
+def build_tutor_analysis(score, total, subject_name, topic_name, review_rows):
+    wrong_rows = [row for row in review_rows if not row['is_correct']]
+    summary = f"You got {score} out of {total} correct. Great effort! Let's level up together."
+    if not wrong_rows:
+        pattern = f"Amazing! You are strong in {topic_name}."
+        misconception = "No repeated mistakes found. Keep practicing to stay sharp!"
+    else:
+        common_user = {}
+        common_correct = {}
+        for row in wrong_rows:
+            common_user[row['user']] = common_user.get(row['user'], 0) + 1
+            common_correct[row['correct']] = common_correct.get(row['correct'], 0) + 1
+        biggest_user = max(common_user.items(), key=lambda item: item[1])[0]
+        biggest_correct = max(common_correct.items(), key=lambda item: item[1])[0]
+        pattern = f"You seem to need more practice in {topic_name}, especially when answer choices look similar."
+        misconception = (
+            f"I noticed a pattern: option {biggest_user} was often picked when option {biggest_correct} was correct. "
+            "Let's slow down and compare each option carefully."
+        )
+    return {
+        'performance_summary': summary,
+        'pattern_summary': pattern,
+        'misconception_summary': misconception,
+        'study_plan': generate_study_plan(topic_name),
+        'wrong_rows': wrong_rows,
+        'subject_name': subject_name,
+        'topic_name': topic_name
+    }
+
+
+def make_initial_tutor_message(analysis):
+    lines = [
+        "Hi! I am your AI Tutor. 🌟",
+        analysis['performance_summary'],
+        analysis['pattern_summary'],
+        analysis['misconception_summary'],
+        "Try these next topics:",
+    ]
+    for item in analysis['study_plan']:
+        lines.append(f"- {item}")
+    lines.append("Tap a wrong question below and I will explain it step by step.")
+    return "\n".join(lines)
+
+
+def call_external_ai_if_available(context_payload, user_message):
+    api_key = os.environ.get('OPENAI_API_KEY', '').strip()
+    if not api_key:
+        return None
+    payload = {
+        "model": os.environ.get('OPENAI_MODEL', 'gpt-4o-mini'),
+        "temperature": 0.3,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are a friendly AI Tutor for grades 1-5. Use simple words, short sentences, and kid-safe tone. "
+                    "Be accurate. Avoid jargon. Keep responses under 120 words."
+                )
+            },
+            {
+                "role": "user",
+                "content": f"Session context: {json.dumps(context_payload)}\nStudent says: {user_message}"
+            }
+        ]
+    }
+    req = urlrequest.Request(
+        "https://api.openai.com/v1/chat/completions",
+        data=json.dumps(payload).encode('utf-8'),
+        method='POST',
+        headers={
+            'Content-Type': 'application/json',
+            'Authorization': f"Bearer {api_key}",
+        }
+    )
+    try:
+        with urlrequest.urlopen(req, timeout=12) as resp:
+            body = resp.read().decode('utf-8')
+        parsed = json.loads(body)
+        return parsed['choices'][0]['message']['content'].strip()
+    except Exception:
+        app.logger.exception("ai_tutor_external_api_failed")
+        return None
+
+
+def save_tutor_message(cur, tutor_session_id, role, message_text, meta=None):
+    cur.execute("""
+        INSERT INTO ai_tutor_messages (tutor_session_id, role, message_text, meta_json)
+        VALUES (%s, %s, %s, %s::jsonb)
+    """, (tutor_session_id, role, message_text, json.dumps(meta or {})))
 
 def ensure_app_settings_table(conn):
     cur = conn.cursor()
@@ -214,12 +389,26 @@ def live():
     return {'status': 'alive'}, 200
 
 @app.route('/')
-def index():
+def landing():
+    """Landing / promotional page shown before login."""
+    # If already logged in, skip landing and go straight to dashboard
     if 'student_id' in session:
         return redirect(url_for('student_dashboard'))
     if 'admin_id' in session:
         return redirect(url_for('admin_dashboard'))
-    return render_template('index.html')
+    return render_template('landing.html')
+ 
+ 
+# ── LOGIN PAGE ROUTE — the existing login/signup page ─────────
+@app.route('/login')
+def login():
+    """Login & sign-up page (was previously served at '/')."""
+    # If already logged in, skip to dashboard
+    if 'student_id' in session:
+        return redirect(url_for('student_dashboard'))
+    if 'admin_id' in session:
+        return redirect(url_for('admin_dashboard'))
+    return render_template('index.html') 
 
 @app.route('/signup', methods=['POST'])
 def signup():
@@ -306,7 +495,12 @@ def student_dashboard():
                 (session['student_id'],))
     total_quizzes = cur.fetchone()['total']
     cur.close(); conn.close()
-    return render_template('student_dash.html', subjects=subjects, total_quizzes=total_quizzes)
+    return render_template(
+        'student_dash.html',
+        subjects=subjects,
+        total_quizzes=total_quizzes,
+        ai_tutor_locked=True
+    )
 
 
 @app.route('/topics/<int:subject_id>')
@@ -323,7 +517,13 @@ def topics(subject_id):
     """, (session['student_id'], subject['subject_name']))
     attempted = [r['topic_name'] for r in cur.fetchall()]
     cur.close(); conn.close()
-    return render_template('topics.html', subject=subject, topics=topics, attempted=attempted)
+    return render_template(
+        'topics.html',
+        subject=subject,
+        topics=topics,
+        attempted=attempted,
+        ai_tutor_locked=True
+    )
 
 @app.route('/quiz/<int:topic_id>')
 @student_required
@@ -354,6 +554,7 @@ def quiz(topic_id):
         'quiz.html',
         questions=questions,
         topic=topic,
+        ai_tutor_locked=True,
         quiz_duration_minutes=quiz_duration_minutes,
         total_time_sec=session.get('quiz_total_time_sec', quiz_duration_minutes * 60),
         remaining_time_sec=get_remaining_quiz_seconds()
@@ -405,6 +606,7 @@ def submit_quiz():
         if is_correct:
             score += 1
         review.append({
+            'question_id': qid,
             'question':   q['question_text'],
             'option_a':   q['option_a'],
             'option_b':   q['option_b'],
@@ -439,8 +641,11 @@ def submit_quiz():
         INSERT INTO results
         (student_id, student_name, subject_name, topic_name, grade, score, total_questions)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
+        RETURNING result_id
     """, (session['student_id'], session['display_name'],
           subject_name, topic_name, session['grade'], score, total))
+    inserted_result = cur.fetchone()
+    quiz_attempt_id = inserted_result['result_id']
     cur.execute("""
         UPDATE students
         SET total_points   = total_points + %s,
@@ -449,11 +654,57 @@ def submit_quiz():
             last_quiz_date = %s
         WHERE student_id = %s
     """, (points_earned, current_streak, longest_streak, today, session['student_id']))
+    analysis = build_tutor_analysis(score, total, subject_name, topic_name, review)
+    tutor_session_id = str(uuid.uuid4())
+    session_context = {
+        'quiz_attempt_id': quiz_attempt_id,
+        'student_id': session.get('student_id'),
+        'subject': subject_name,
+        'topic': topic_name,
+        'questions': [
+            {
+                'question_id': qid,
+                'question_text': row['question'],
+                'selected_option': row['user'],
+                'selected_answer': option_text_from_label(row, row['user']),
+                'correct_option': row['correct'],
+                'correct_answer': option_text_from_label(row, row['correct']),
+                'is_correct': row['is_correct']
+            }
+            for qid, row in zip(question_ids, review)
+        ]
+    }
+    ensure_ai_tutor_tables(conn)
+    cur.execute("""
+        INSERT INTO ai_tutor_sessions (
+            tutor_session_id, quiz_attempt_id, student_id, subject_name, topic_name, score, total_questions,
+            performance_summary, pattern_summary, misconception_summary, study_plan_json, context_json, wrong_question_ids_json
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb)
+    """, (
+        tutor_session_id,
+        quiz_attempt_id,
+        session.get('student_id'),
+        subject_name,
+        topic_name,
+        score,
+        total,
+        analysis['performance_summary'],
+        analysis['pattern_summary'],
+        analysis['misconception_summary'],
+        json.dumps(analysis['study_plan']),
+        json.dumps(session_context),
+        json.dumps([q['question_id'] for q in session_context['questions'] if not q['is_correct']])
+    ))
+    initial_message = make_initial_tutor_message(analysis)
+    save_tutor_message(cur, tutor_session_id, 'assistant', initial_message, {'type': 'auto_analysis'})
     conn.commit()
     cur.close(); conn.close()
     session['total_points']   = session.get('total_points', 0) + points_earned
     session['current_streak'] = current_streak
     session['longest_streak'] = longest_streak
+    session['ai_tutor_session_id'] = tutor_session_id
+    session['ai_tutor_quiz_attempt_id'] = quiz_attempt_id
     session.pop('quiz_total_time_sec', None)
     session.pop('quiz_started_at', None)
     session.pop('quiz_failed', None)
@@ -463,7 +714,10 @@ def submit_quiz():
         topic_name=topic_name,
         subject_name=subject_name,
         review=review,
-        current_streak=current_streak)
+        current_streak=current_streak,
+        ai_tutor_locked=False,
+        tutor_session_id=tutor_session_id,
+        quiz_attempt_id=quiz_attempt_id)
 
 @app.route('/history')
 @student_required
@@ -864,6 +1118,211 @@ def delete_admin(aid):
     cur.close(); conn.close()
     flash('Admin removed.', 'success')
     return redirect(url_for('manage_admins'))
+
+
+@app.route('/ai-tutor/<tutor_session_id>')
+@student_required
+def ai_tutor(tutor_session_id):
+    conn = get_db()
+    ensure_ai_tutor_tables(conn)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT *
+        FROM ai_tutor_sessions
+        WHERE tutor_session_id = %s AND student_id = %s
+    """, (tutor_session_id, session['student_id']))
+    tutor_session = cur.fetchone()
+    if not tutor_session:
+        cur.close()
+        conn.close()
+        flash('AI Tutor is locked. Finish a quiz to unlock it.', 'warning')
+        return redirect(url_for('student_dashboard'))
+    cur.execute("""
+        SELECT role, message_text, meta_json, created_at
+        FROM ai_tutor_messages
+        WHERE tutor_session_id = %s
+        ORDER BY created_at ASC, message_id ASC
+    """, (tutor_session_id,))
+    messages = cur.fetchall()
+    context = tutor_session['context_json']
+    wrong_questions = [q for q in context.get('questions', []) if not q.get('is_correct')]
+    cur.close()
+    conn.close()
+    return render_template(
+        'ai_tutor.html',
+        tutor_session=tutor_session,
+        messages=messages,
+        wrong_questions=wrong_questions,
+        ai_tutor_locked=False,
+        tutor_session_id=tutor_session_id
+    )
+
+
+@app.route('/api/ai-tutor/explain', methods=['POST'])
+@student_required
+def ai_tutor_explain():
+    payload = request.get_json(silent=True) or {}
+    tutor_session_id = payload.get('tutor_session_id', '')
+    question_id = payload.get('question_id')
+    conn = get_db()
+    ensure_ai_tutor_tables(conn)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT context_json
+        FROM ai_tutor_sessions
+        WHERE tutor_session_id = %s AND student_id = %s
+    """, (tutor_session_id, session['student_id']))
+    tutor_session = cur.fetchone()
+    if not tutor_session:
+        cur.close()
+        conn.close()
+        return jsonify({'error': 'Tutor session not found.'}), 404
+    context = tutor_session['context_json']
+    selected = None
+    for item in context.get('questions', []):
+        if int(item.get('question_id', -1)) == int(question_id):
+            selected = item
+            break
+    if not selected:
+        cur.close()
+        conn.close()
+        return jsonify({'error': 'Question not found for this session.'}), 404
+    explainer = (
+        f"Let's solve this step by step. ✨\n"
+        f"Question: {selected['question_text']}\n"
+        f"You chose: {selected['selected_option']}) {selected['selected_answer']}\n"
+        f"Correct answer: {selected['correct_option']}) {selected['correct_answer']}\n"
+        "Tip: Read the question slowly, then remove two wrong options first.\n"
+        f"Easier one: Can you solve a simpler {context.get('topic', 'practice')} example now?"
+    )
+    save_tutor_message(cur, tutor_session_id, 'assistant', explainer, {'type': 'question_explanation', 'question_id': question_id})
+    conn.commit()
+    cur.close()
+    conn.close()
+    return jsonify({'message': explainer})
+
+
+@app.route('/api/ai-tutor/chat', methods=['POST'])
+@student_required
+def ai_tutor_chat():
+    payload = request.get_json(silent=True) or {}
+    tutor_session_id = payload.get('tutor_session_id', '')
+    raw_text = payload.get('message', '')
+    user_text = sanitize_child_prompt(raw_text)
+    if not user_text:
+        return jsonify({'error': 'Please type a message first.'}), 400
+    conn = get_db()
+    ensure_ai_tutor_tables(conn)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT context_json
+        FROM ai_tutor_sessions
+        WHERE tutor_session_id = %s AND student_id = %s
+    """, (tutor_session_id, session['student_id']))
+    tutor_session = cur.fetchone()
+    if not tutor_session:
+        cur.close()
+        conn.close()
+        return jsonify({'error': 'Tutor session not found.'}), 404
+    save_tutor_message(cur, tutor_session_id, 'user', user_text, {'type': 'chat_input'})
+    lower = user_text.lower()
+    if 'example' in lower or 'real life' in lower:
+        fallback = "Think of division like sharing chocolates with friends. If 10 chocolates are shared by 2 friends, each friend gets 5."
+    elif 'easy' in lower or 'simpler' in lower:
+        fallback = "Let's try an easier one: What is 10 ÷ 2? You can do it!"
+    elif 'i dont understand' in lower or "don't understand" in lower:
+        fallback = "No worries. We will do it slowly, one step at a time. You are learning, and that is what matters. 🙂"
+    else:
+        fallback = "Great question! Let's solve one small step first, then check your answer together."
+    ai_response = call_external_ai_if_available(tutor_session['context_json'], user_text) or fallback
+    save_tutor_message(cur, tutor_session_id, 'assistant', ai_response, {'type': 'chat_reply'})
+    conn.commit()
+    cur.close()
+    conn.close()
+    return jsonify({'message': ai_response})
+
+
+@app.route('/api/ai-tutor/redemption/new', methods=['POST'])
+@student_required
+def ai_tutor_redemption_new():
+    payload = request.get_json(silent=True) or {}
+    tutor_session_id = payload.get('tutor_session_id', '')
+    conn = get_db()
+    ensure_ai_tutor_tables(conn)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT topic_name
+        FROM ai_tutor_sessions
+        WHERE tutor_session_id = %s AND student_id = %s
+    """, (tutor_session_id, session['student_id']))
+    tutor_session = cur.fetchone()
+    if not tutor_session:
+        cur.close()
+        conn.close()
+        return jsonify({'error': 'Tutor session not found.'}), 404
+    a = random.randint(2, 12)
+    b = random.randint(2, 10)
+    question_text = f"Level-Up Challenge: What is {a} x {b}?"
+    answer_text = str(a * b)
+    cur.execute("""
+        INSERT INTO ai_tutor_redemptions (tutor_session_id, question_text, answer_text)
+        VALUES (%s, %s, %s)
+        RETURNING redemption_id
+    """, (tutor_session_id, question_text, answer_text))
+    redemption = cur.fetchone()
+    prompt = f"{question_text} Send just the number."
+    save_tutor_message(cur, tutor_session_id, 'assistant', prompt, {'type': 'redemption_question', 'redemption_id': redemption['redemption_id']})
+    conn.commit()
+    cur.close()
+    conn.close()
+    return jsonify({'redemption_id': redemption['redemption_id'], 'question_text': question_text})
+
+
+@app.route('/api/ai-tutor/redemption/answer', methods=['POST'])
+@student_required
+def ai_tutor_redemption_answer():
+    payload = request.get_json(silent=True) or {}
+    tutor_session_id = payload.get('tutor_session_id', '')
+    redemption_id = payload.get('redemption_id')
+    student_answer = sanitize_child_prompt(str(payload.get('answer', '')))
+    conn = get_db()
+    ensure_ai_tutor_tables(conn)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT r.redemption_id, r.answer_text
+        FROM ai_tutor_redemptions r
+        JOIN ai_tutor_sessions s ON s.tutor_session_id = r.tutor_session_id
+        WHERE r.redemption_id = %s AND r.tutor_session_id = %s AND s.student_id = %s
+    """, (redemption_id, tutor_session_id, session['student_id']))
+    redemption = cur.fetchone()
+    if not redemption:
+        cur.close()
+        conn.close()
+        return jsonify({'error': 'Challenge not found.'}), 404
+    is_correct = student_answer.strip() == redemption['answer_text'].strip()
+    awarded = 2 if is_correct else 0
+    cur.execute("""
+        UPDATE ai_tutor_redemptions
+        SET student_answer = %s, is_correct = %s, awarded_points = %s
+        WHERE redemption_id = %s
+    """, (student_answer, is_correct, awarded, redemption_id))
+    if awarded > 0:
+        cur.execute("""
+            UPDATE students
+            SET total_points = total_points + %s
+            WHERE student_id = %s
+        """, (awarded, session['student_id']))
+        session['total_points'] = session.get('total_points', 0) + awarded
+    message = (
+        "Great job! You earned back 2 points! 🎉"
+        if is_correct
+        else f"Nice try! The answer was {redemption['answer_text']}. Let's keep practicing."
+    )
+    save_tutor_message(cur, tutor_session_id, 'assistant', message, {'type': 'redemption_result', 'awarded_points': awarded})
+    conn.commit()
+    cur.close()
+    conn.close()
+    return jsonify({'is_correct': is_correct, 'awarded_points': awarded, 'message': message})
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

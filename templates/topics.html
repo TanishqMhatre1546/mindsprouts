@@ -21,6 +21,19 @@
 </div>
 
 <div class="container" style="max-width:700px">
+    <div class="tutor-launch-card tutor-card-topics">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h6 style="margin:0;font-family:'Baloo 2',sans-serif;font-weight:800">
+                    <i class="fa-solid fa-lock"></i> AI Tutor is locked
+                </h6>
+                <small class="text-muted">Finish this quiz topic first, then use AI Tutor from Results.</small>
+            </div>
+            <button class="btn-outline-ms" type="button" disabled style="opacity:.6;cursor:not-allowed">
+                <i class="fa-solid fa-robot"></i> AI Tutor
+            </button>
+        </div>
+    </div>
 
     <!-- Progress bar for this subject -->
     {% if topics|length > 0 %}

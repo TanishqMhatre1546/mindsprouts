@@ -82,6 +82,9 @@
 
         <!-- Action Buttons -->
         <div class="d-flex gap-3 justify-content-center flex-wrap">
+            <a href="{{ url_for('ai_tutor', tutor_session_id=tutor_session_id) }}" class="btn-primary-ms" style="background:linear-gradient(135deg,#7c5cfc,#9b7dff)">
+                <i class="fa-solid fa-robot"></i> AI Tutor
+            </a>
             <a href="{{ url_for('student_dashboard') }}" class="btn-outline-ms">
                 <i class="fa-solid fa-house"></i> Home
             </a>
@@ -91,6 +94,20 @@
             </a>
             <a href="{{ url_for('leaderboard') }}" class="btn-primary-ms">
                 <i class="fa-solid fa-trophy"></i> Leaderboard
+            </a>
+        </div>
+    </div>
+
+    <div class="tutor-launch-card">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h6 style="margin:0;font-family:'Baloo 2',sans-serif;font-weight:800">
+                    AI Tutor unlocked for this quiz
+                </h6>
+                <small class="text-muted">Get step-by-step help and level-up challenges.</small>
+            </div>
+            <a href="{{ url_for('ai_tutor', tutor_session_id=tutor_session_id) }}" class="btn-outline-ms">
+                Open Tutor
             </a>
         </div>
     </div>
@@ -132,6 +149,14 @@
             </strong>
             {% endif %}
         </div>
+        {% if not item.is_correct %}
+        <div class="mt-2">
+            <a class="btn btn-sm btn-light"
+               href="{{ url_for('ai_tutor', tutor_session_id=tutor_session_id) }}?question_id={{ item.question_id }}">
+                <i class="fa-solid fa-robot"></i> Explain with AI Tutor
+            </a>
+        </div>
+        {% endif %}
     </div>
     {% endfor %}
 

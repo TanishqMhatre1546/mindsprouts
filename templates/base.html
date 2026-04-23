@@ -64,6 +64,20 @@
                         <span>Profile</span>
                     </a>
                 </li>
+                <li class="nav-item">
+                    {% if ai_tutor_locked is defined and not ai_tutor_locked and tutor_session_id is defined %}
+                    <a class="nav-link {% if request.endpoint == 'ai_tutor' %}nav-active{% endif %}"
+                       href="{{ url_for('ai_tutor', tutor_session_id=tutor_session_id) }}">
+                        <i class="fa-solid fa-robot"></i>
+                        <span>AI Tutor</span>
+                    </a>
+                    {% else %}
+                    <a class="nav-link nav-link-locked" href="#" aria-disabled="true" tabindex="-1" title="Finish a quiz to unlock AI Tutor">
+                        <i class="fa-solid fa-lock"></i>
+                        <span>AI Tutor</span>
+                    </a>
+                    {% endif %}
+                </li>
                 <li class="nav-item d-none d-lg-block">
                     <span class="points-badge">
                         <i class="fa-solid fa-star"></i> {{ session.total_points }} pts
