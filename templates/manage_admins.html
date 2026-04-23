@@ -21,6 +21,7 @@
             <i class="fa-solid fa-plus"></i> Add New Admin
         </h5>
         <form action="{{ url_for('add_admin') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="row g-3">
                 <div class="col-md-4">
                     <label class="form-label fw-bold small">Display Name</label>
@@ -91,11 +92,12 @@
                         </td>
                         <td>
                             {% if a.admin_id != session.admin_id %}
-                            <a href="{{ url_for('delete_admin', aid=a.admin_id) }}"
-                               class="btn btn-sm btn-danger"
-                               onclick="return confirm('Remove this admin?')">
-                                <i class="fa-solid fa-trash"></i>
-                            </a>
+                            <form action="{{ url_for('delete_admin', aid=a.admin_id) }}" method="POST" style="display:inline" onsubmit="return confirm('Remove this admin?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-danger">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </form>
                             {% else %}
                             <span class="text-muted small">You</span>
                             {% endif %}

@@ -21,7 +21,12 @@
                     <h5 class="mb-0"><i class="fa-solid fa-robot"></i> AI Tutor</h5>
                     <small class="text-muted">{{ tutor_session.subject_name }} · {{ tutor_session.topic_name }}</small>
                 </div>
-                <span class="badge" style="background:#eef2ff;color:#4f46e5">Quiz {{ tutor_session.score }}/{{ tutor_session.total_questions }}</span>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-light" id="tutor-tts-toggle" title="Read replies aloud" aria-pressed="false">
+                        <i class="fa-solid fa-volume-high"></i> Read
+                    </button>
+                    <span class="badge" style="background:#eef2ff;color:#4f46e5">Quiz {{ tutor_session.score }}/{{ tutor_session.total_questions }}</span>
+                </div>
             </div>
         </div>
 
@@ -48,11 +53,21 @@
 
         <div class="tutor-input-wrap">
             <form id="tutor-chat-form" class="d-flex gap-2">
-                <input id="tutor-chat-input" type="text" maxlength="400" class="form-control" placeholder="Ask for help, examples, or an easier question..." />
+                <div class="input-group">
+                    <input id="tutor-chat-input" type="text" maxlength="400" class="form-control" placeholder="Ask for help, examples, or an easier question..." />
+                    <button type="button" class="btn btn-light voice-btn" data-voice-target="#tutor-chat-input" aria-label="Voice input" title="Speak">
+                        <i class="fa-solid fa-microphone"></i>
+                    </button>
+                </div>
                 <button class="btn-primary-ms" type="submit">Send</button>
             </form>
             <form id="redemption-answer-form" class="d-flex gap-2 mt-2" style="display:none !important">
-                <input id="redemption-answer-input" type="text" class="form-control" placeholder="Type your challenge answer" />
+                <div class="input-group">
+                    <input id="redemption-answer-input" type="text" class="form-control" placeholder="Type your challenge answer" />
+                    <button type="button" class="btn btn-light voice-btn" data-voice-target="#redemption-answer-input" aria-label="Voice input" title="Speak">
+                        <i class="fa-solid fa-microphone"></i>
+                    </button>
+                </div>
                 <button class="btn-outline-ms" type="submit">Check</button>
             </form>
         </div>

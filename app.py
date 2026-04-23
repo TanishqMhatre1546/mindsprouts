@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, abort
 import psycopg2
 import psycopg2.extras
 import psycopg2.pool
@@ -12,9 +12,13 @@ import time
 import json
 import re
 import threading
+from functools import wraps
+from contextlib import contextmanager
 from urllib import request as urlrequest
 from urllib import error as urlerror
 from dotenv import load_dotenv
+from werkzeug.security import generate_password_hash, check_password_hash
+import secrets
 
 load_dotenv()
 
@@ -36,6 +40,27 @@ DEFAULT_QUIZ_DURATION_MINUTES = 5
 MAX_TUTOR_CHAT_CHARS = 400
 _db_pool = None
 _db_pool_lock = threading.Lock()
+_schema_initialized = False
+_schema_lock = threading.Lock()
+
+
+@contextmanager
+def db_cursor(commit=False):
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        yield conn, cur
+        if commit:
+            conn.commit()
+    finally:
+        try:
+            cur.close()
+        except Exception:
+            pass
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 class PooledConnection:
@@ -68,6 +93,20 @@ def get_remaining_quiz_seconds():
         return None
     elapsed = max(0, int(time.time()) - int(started_at))
     return max(0, int(total_time_sec) - elapsed)
+
+
+def is_quiz_active():
+    # Active quiz = questions picked and not submitted/failed and time remaining.
+    if not session.get('quiz_questions'):
+        return False
+    if session.get('quiz_submitted'):
+        return False
+    if session.get('quiz_failed'):
+        return False
+    remaining = get_remaining_quiz_seconds()
+    if remaining is None:
+        return True
+    return remaining > 0
 
 def get_db():
     global _db_pool
@@ -118,11 +157,34 @@ def get_db():
                         port=pg_port,
                         cursor_factory=psycopg2.extras.RealDictCursor
                     )
+                init_schema_once()
     conn = _db_pool.getconn()
     return PooledConnection(_db_pool, conn)
 
+def _is_legacy_sha256_hash(stored_hash):
+    if not stored_hash:
+        return False
+    if len(stored_hash) != 64:
+        return False
+    return bool(re.fullmatch(r"[0-9a-f]{64}", stored_hash))
+
+
 def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+    return generate_password_hash(password)
+
+
+def verify_password_and_maybe_upgrade(stored_hash, password):
+    if not stored_hash:
+        return False, None
+    if _is_legacy_sha256_hash(stored_hash):
+        legacy = hashlib.sha256(password.encode()).hexdigest()
+        if secrets.compare_digest(legacy, stored_hash):
+            return True, hash_password(password)
+        return False, None
+    try:
+        return bool(check_password_hash(stored_hash, password)), None
+    except Exception:
+        return False, None
 
 
 def sanitize_child_prompt(text):
@@ -201,6 +263,43 @@ def option_text_from_label(q, label):
     return ''
 
 
+def ensure_general_tutor_session(student_id):
+    existing = session.get('general_tutor_session_id')
+    if existing:
+        return existing
+    tutor_session_id = str(uuid.uuid4())
+    with db_cursor(commit=True) as (conn, cur):
+        context = {'mode': 'general', 'student_id': student_id}
+        cur.execute("""
+            INSERT INTO ai_tutor_sessions (
+                tutor_session_id, quiz_attempt_id, student_id, subject_name, topic_name,
+                score, total_questions, performance_summary, pattern_summary,
+                misconception_summary, study_plan_json, context_json, wrong_question_ids_json, unlocked
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s)
+        """, (
+            tutor_session_id,
+            -1,
+            student_id,
+            'General',
+            'General Studies',
+            0,
+            0,
+            "Hi! I’m your AI Tutor. Ask me anything about your studies.",
+            "I can help with Maths, English, Science, EVS, GK and more.",
+            "Tell me your question and I’ll explain it step by step.",
+            json.dumps([]),
+            json.dumps(context),
+            json.dumps([]),
+            True
+        ))
+        save_tutor_message(cur, tutor_session_id, 'assistant',
+                          "Hi! I’m Sprout 🌱 Your AI Tutor. Ask me any school question and I’ll help!",
+                          {'type': 'general_welcome'})
+    session['general_tutor_session_id'] = tutor_session_id
+    return tutor_session_id
+
+
 def generate_study_plan(topic_name):
     base = [
         f"{topic_name} basics",
@@ -222,7 +321,7 @@ def build_tutor_analysis(score, total, subject_name, topic_name, review_rows):
     if not wrong_rows:
         pattern = f"Amazing! You are strong in {topic_name}."
         misconception = "No repeated mistakes found. Keep practicing to stay sharp!"
-    else:
+    if True:
         common_user = {}
         common_correct = {}
         for row in wrong_rows:
@@ -436,7 +535,6 @@ def ensure_app_settings_table(conn):
     cur.close()
 
 def get_quiz_duration_minutes(conn):
-    ensure_app_settings_table(conn)
     cur = conn.cursor()
     cur.execute("SELECT value FROM app_settings WHERE key = %s", ('quiz_duration_minutes',))
     row = cur.fetchone()
@@ -448,7 +546,6 @@ def get_quiz_duration_minutes(conn):
     return DEFAULT_QUIZ_DURATION_MINUTES
 
 def set_quiz_duration_minutes(conn, minutes):
-    ensure_app_settings_table(conn)
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO app_settings (key, value)
@@ -458,6 +555,28 @@ def set_quiz_duration_minutes(conn, minutes):
     """, ('quiz_duration_minutes', str(minutes)))
     conn.commit()
     cur.close()
+
+def ensure_core_tables(conn):
+    # Called once on cold start, not on hot paths.
+    ensure_ai_tutor_tables(conn)
+    ensure_app_settings_table(conn)
+
+
+def init_schema_once():
+    global _schema_initialized
+    if _schema_initialized:
+        return
+    with _schema_lock:
+        if _schema_initialized:
+            return
+        try:
+            conn = _db_pool.getconn()
+            wrapped = PooledConnection(_db_pool, conn)
+            ensure_core_tables(wrapped)
+            wrapped.close()
+            _schema_initialized = True
+        except Exception:
+            app.logger.exception("schema_init_failed")
 
 
 def fetch_topics_for_subject_with_grade_fallback(cur, subject_id, grade):
@@ -487,7 +606,6 @@ def count_topics_for_subject_with_grade_fallback(cur, subject_id, grade):
     return cur.fetchone()['total']
 
 def student_required(f):
-    from functools import wraps
     @wraps(f)
     def decorated(*args, **kwargs):
         if 'student_id' not in session:
@@ -497,7 +615,6 @@ def student_required(f):
     return decorated
 
 def admin_required(f):
-    from functools import wraps
     @wraps(f)
     def decorated(*args, **kwargs):
         if 'admin_id' not in session:
@@ -507,7 +624,6 @@ def admin_required(f):
     return decorated
 
 def super_admin_required(f):
-    from functools import wraps
     @wraps(f)
     def decorated(*args, **kwargs):
         if 'admin_id' not in session or not session.get('is_super_admin'):
@@ -515,6 +631,33 @@ def super_admin_required(f):
             return redirect(url_for('admin_dashboard'))
         return f(*args, **kwargs)
     return decorated
+
+
+def _get_csrf_token():
+    token = session.get('csrf_token')
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session['csrf_token'] = token
+    return token
+
+
+@app.context_processor
+def inject_csrf():
+    return {'csrf_token': _get_csrf_token}
+
+
+@app.before_request
+def csrf_protect():
+    _get_csrf_token()
+    if request.method not in ('POST', 'PUT', 'PATCH', 'DELETE'):
+        return
+    if request.endpoint in ('health', 'live'):
+        return
+    token = session.get('csrf_token', '')
+    supplied = request.headers.get('X-CSRF-Token', '') if request.is_json else request.form.get('csrf_token', '')
+    if not supplied or not token or not secrets.compare_digest(str(supplied), str(token)):
+        abort(400, description="CSRF token missing or invalid")
+
 
 
 @app.before_request
@@ -586,19 +729,15 @@ def signup():
     username     = request.form['username'].strip().lower()
     password     = request.form['password']
     grade        = int(request.form['grade'])
-    conn = get_db()
-    cur  = conn.cursor()
-    cur.execute("SELECT student_id FROM students WHERE username = %s", (username,))
-    if cur.fetchone():
-        flash('Username already taken!', 'danger')
-        cur.close(); conn.close()
-        return redirect(url_for('index'))
-    cur.execute("""
-        INSERT INTO students (display_name, username, password_hash, grade)
-        VALUES (%s, %s, %s, %s)
-    """, (display_name, username, hash_password(password), grade))
-    conn.commit()
-    cur.close(); conn.close()
+    with db_cursor(commit=True) as (conn, cur):
+        cur.execute("SELECT student_id FROM students WHERE username = %s", (username,))
+        if cur.fetchone():
+            flash('Username already taken!', 'danger')
+            return redirect(url_for('index'))
+        cur.execute("""
+            INSERT INTO students (display_name, username, password_hash, grade)
+            VALUES (%s, %s, %s, %s)
+        """, (display_name, username, hash_password(password), grade))
     flash('Account created! Please login.', 'success')
     return redirect(url_for('index'))
 
@@ -606,12 +745,21 @@ def signup():
 def student_login():
     username = request.form['username'].strip().lower()
     password = request.form['password']
-    conn = get_db()
-    cur  = conn.cursor()
-    cur.execute("SELECT * FROM students WHERE username = %s AND password_hash = %s",
-                (username, hash_password(password)))
-    student = cur.fetchone()
-    cur.close(); conn.close()
+    with db_cursor(commit=True) as (conn, cur):
+        cur.execute("SELECT * FROM students WHERE username = %s", (username,))
+        student = cur.fetchone()
+        if not student:
+            flash('Wrong username or password!', 'danger')
+            return redirect(url_for('index'))
+        ok, upgraded = verify_password_and_maybe_upgrade(student.get('password_hash'), password)
+        if not ok:
+            flash('Wrong username or password!', 'danger')
+            return redirect(url_for('index'))
+        if upgraded:
+            cur.execute(
+                "UPDATE students SET password_hash = %s WHERE student_id = %s",
+                (upgraded, student['student_id'])
+            )
     if student:
         session['student_id']     = student['student_id']
         session['display_name']   = student['display_name']
@@ -621,26 +769,31 @@ def student_login():
         session['longest_streak'] = student['longest_streak']
         session['timer_enabled']  = False
         return redirect(url_for('student_dashboard'))
-    flash('Wrong username or password!', 'danger')
-    return redirect(url_for('index'))
 
 @app.route('/admin_login', methods=['POST'])
 def admin_login():
     username = request.form['username'].strip().lower()
     password = request.form['password']
-    conn = get_db()
-    cur  = conn.cursor()
-    cur.execute("SELECT * FROM admins WHERE username = %s AND password_hash = %s",
-                (username, hash_password(password)))
-    admin = cur.fetchone()
-    cur.close(); conn.close()
+    with db_cursor(commit=True) as (conn, cur):
+        cur.execute("SELECT * FROM admins WHERE username = %s", (username,))
+        admin = cur.fetchone()
+        if not admin:
+            flash('Wrong admin credentials!', 'danger')
+            return redirect(url_for('index'))
+        ok, upgraded = verify_password_and_maybe_upgrade(admin.get('password_hash'), password)
+        if not ok:
+            flash('Wrong admin credentials!', 'danger')
+            return redirect(url_for('index'))
+        if upgraded:
+            cur.execute(
+                "UPDATE admins SET password_hash = %s WHERE admin_id = %s",
+                (upgraded, admin['admin_id'])
+            )
     if admin:
         session['admin_id']       = admin['admin_id']
         session['display_name']   = admin['display_name']
         session['is_super_admin'] = admin['is_super_admin']
         return redirect(url_for('admin_dashboard'))
-    flash('Wrong admin credentials!', 'danger')
-    return redirect(url_for('index'))
 
 @app.route('/logout')
 def logout():
@@ -657,19 +810,25 @@ def toggle_timer():
 @app.route('/dashboard')
 @student_required
 def student_dashboard():
-    conn = get_db()
-    cur  = conn.cursor()
-    cur.execute("SELECT * FROM subjects")
-    subjects = cur.fetchall()
-    cur.execute("SELECT COUNT(*) AS total FROM results WHERE student_id = %s",
-                (session['student_id'],))
-    total_quizzes = cur.fetchone()['total']
-    cur.close(); conn.close()
+    with db_cursor() as (conn, cur):
+        cur.execute("SELECT * FROM subjects")
+        subjects = cur.fetchall()
+        cur.execute("SELECT COUNT(*) AS total FROM results WHERE student_id = %s",
+                    (session['student_id'],))
+        total_quizzes = cur.fetchone()['total']
+        cur.execute("SELECT total_points, current_streak, longest_streak FROM students WHERE student_id = %s",
+                    (session['student_id'],))
+        stats = cur.fetchone() or {}
+        session['total_points'] = stats.get('total_points', session.get('total_points', 0))
+        session['current_streak'] = stats.get('current_streak', session.get('current_streak', 0))
+        session['longest_streak'] = stats.get('longest_streak', session.get('longest_streak', 0))
+    tutor_session_id = ensure_general_tutor_session(session['student_id'])
     return render_template(
         'student_dash.html',
         subjects=subjects,
         total_quizzes=total_quizzes,
-        ai_tutor_locked=True
+        ai_tutor_locked=is_quiz_active(),
+        tutor_session_id=tutor_session_id
     )
 
 @app.route('/topics/<int:subject_id>')
@@ -686,12 +845,14 @@ def topics(subject_id):
     """, (session['student_id'], subject['subject_name']))
     attempted = [r['topic_name'] for r in cur.fetchall()]
     cur.close(); conn.close()
+    tutor_session_id = ensure_general_tutor_session(session['student_id'])
     return render_template(
         'topics.html',
         subject=subject,
         topics=topics,
         attempted=attempted,
-        ai_tutor_locked=True
+        ai_tutor_locked=is_quiz_active(),
+        tutor_session_id=tutor_session_id
     )
 
 @app.route('/quiz/<int:topic_id>')
@@ -728,6 +889,16 @@ def quiz(topic_id):
         total_time_sec=session.get('quiz_total_time_sec', quiz_duration_minutes * 60),
         remaining_time_sec=get_remaining_quiz_seconds()
     )
+
+
+@app.route('/ai-tutor')
+@student_required
+def ai_tutor_home():
+    if is_quiz_active():
+        flash('AI Tutor is locked while your quiz is running. Finish the quiz to use it.', 'warning')
+        return redirect(url_for('quiz', topic_id=session.get('quiz_topic_id'))) if session.get('quiz_topic_id') else redirect(url_for('student_dashboard'))
+    tutor_session_id = ensure_general_tutor_session(session['student_id'])
+    return redirect(url_for('ai_tutor', tutor_session_id=tutor_session_id))
 
 
 @app.route('/quiz/failed')
@@ -767,9 +938,12 @@ def submit_quiz():
     cur  = conn.cursor()
     score  = 0
     review = []
+    cur.execute("SELECT * FROM questions WHERE question_id = ANY(%s)", (question_ids,))
+    fetched = {int(q['question_id']): q for q in cur.fetchall()}
     for qid in question_ids:
-        cur.execute("SELECT * FROM questions WHERE question_id = %s", (qid,))
-        q = cur.fetchone()
+        q = fetched.get(int(qid))
+        if not q:
+            continue
         user_answer = request.form.get(f'q_{qid}', '')
         is_correct  = user_answer.upper() == q['correct_option'].upper()
         if is_correct:
@@ -843,7 +1017,6 @@ def submit_quiz():
             for qid, row in zip(question_ids, review)
         ]
     }
-    ensure_ai_tutor_tables(conn)
     cur.execute("""
         INSERT INTO ai_tutor_sessions (
             tutor_session_id, quiz_attempt_id, student_id, subject_name, topic_name, score, total_questions,
@@ -933,7 +1106,7 @@ def progress():
         attempted = cur.fetchone()['attempted']
         pct = int((attempted / total_topics * 100)) if total_topics > 0 else 0
         cur.execute("""
-            SELECT AVG(score / total_questions * 100) AS avg_score FROM results
+            SELECT AVG(score::float / NULLIF(total_questions, 0) * 100) AS avg_score FROM results
             WHERE student_id = %s AND subject_name = %s
         """, (session['student_id'], subj['subject_name']))
         avg = cur.fetchone()['avg_score']
@@ -973,7 +1146,7 @@ def profile():
     total_quizzes = cur.fetchone()['total']
     cur.execute("""
         SELECT subject_name, COUNT(*) AS count,
-               AVG(score/total_questions*100) AS avg_score
+               AVG(score::float / NULLIF(total_questions, 0) * 100) AS avg_score
         FROM results WHERE student_id = %s GROUP BY subject_name
     """, (session['student_id'],))
     subject_stats = cur.fetchall()
@@ -991,15 +1164,21 @@ def change_password():
     confirm_pw = request.form['confirm_password']
     conn = get_db()
     cur  = conn.cursor()
-    cur.execute("SELECT student_id FROM students WHERE student_id = %s AND password_hash = %s",
-                (session['student_id'], hash_password(current_pw)))
-    valid = cur.fetchone()
-    if not valid:
+    cur.execute("SELECT password_hash FROM students WHERE student_id = %s", (session['student_id'],))
+    row = cur.fetchone() or {}
+    ok, _ = verify_password_and_maybe_upgrade(row.get('password_hash'), current_pw)
+    if not ok:
         flash('Current password is incorrect!', 'danger')
-    elif new_pw != confirm_pw:
+        cur.close(); conn.close()
+        return redirect(url_for('profile'))
+    if new_pw != confirm_pw:
         flash('New passwords do not match!', 'danger')
-    elif len(new_pw) < 4:
+        cur.close(); conn.close()
+        return redirect(url_for('profile'))
+    if len(new_pw) < 4:
         flash('Password must be at least 4 characters!', 'danger')
+        cur.close(); conn.close()
+        return redirect(url_for('profile'))
     else:
         cur.execute("UPDATE students SET password_hash = %s WHERE student_id = %s",
                     (hash_password(new_pw), session['student_id']))
@@ -1152,7 +1331,7 @@ def edit_topic(topic_id):
     flash('Topic updated successfully.', 'success')
     return redirect(url_for('manage_topics'))
 
-@app.route('/admin/topics/delete/<int:topic_id>')
+@app.route('/admin/topics/delete/<int:topic_id>', methods=['POST'])
 @admin_required
 def delete_topic(topic_id):
     conn = get_db()
@@ -1172,6 +1351,10 @@ def delete_topic(topic_id):
 @app.route('/admin/questions/add', methods=['POST'])
 @admin_required
 def add_question():
+    correct = (request.form.get('correct_option', '') or '').strip().upper()
+    if correct not in ('A', 'B', 'C', 'D'):
+        flash('Correct answer must be A, B, C, or D.', 'danger')
+        return redirect(url_for('manage_questions'))
     conn = get_db()
     cur  = conn.cursor()
     cur.execute("""
@@ -1181,7 +1364,7 @@ def add_question():
     """, (request.form['topic_id'], request.form['question_text'],
           request.form['option_a'], request.form['option_b'],
           request.form['option_c'], request.form['option_d'],
-          request.form['correct_option'].upper()))
+          correct))
     conn.commit()
     cur.close(); conn.close()
     flash('Question added!', 'success')
@@ -1190,6 +1373,10 @@ def add_question():
 @app.route('/admin/questions/edit/<int:qid>', methods=['POST'])
 @admin_required
 def edit_question(qid):
+    correct = (request.form.get('correct_option', '') or '').strip().upper()
+    if correct not in ('A', 'B', 'C', 'D'):
+        flash('Correct answer must be A, B, C, or D.', 'danger')
+        return redirect(url_for('manage_questions'))
     conn = get_db()
     cur  = conn.cursor()
     cur.execute("""
@@ -1200,14 +1387,14 @@ def edit_question(qid):
     """, (request.form['question_text'],
           request.form['option_a'], request.form['option_b'],
           request.form['option_c'], request.form['option_d'],
-          request.form['correct_option'].upper(),
+          correct,
           request.form['topic_id'], qid))
     conn.commit()
     cur.close(); conn.close()
     flash('Question updated!', 'success')
     return redirect(url_for('manage_questions'))
 
-@app.route('/admin/questions/delete/<int:qid>')
+@app.route('/admin/questions/delete/<int:qid>', methods=['POST'])
 @admin_required
 def delete_question(qid):
     conn = get_db()
@@ -1292,7 +1479,7 @@ def add_admin():
     flash('Admin added!', 'success')
     return redirect(url_for('manage_admins'))
 
-@app.route('/admin/admins/delete/<int:aid>')
+@app.route('/admin/admins/delete/<int:aid>', methods=['POST'])
 @super_admin_required
 def delete_admin(aid):
     if aid == session['admin_id']:
@@ -1310,8 +1497,12 @@ def delete_admin(aid):
 @app.route('/ai-tutor/<tutor_session_id>')
 @student_required
 def ai_tutor(tutor_session_id):
+    if is_quiz_active():
+        flash('AI Tutor is locked while your quiz is running. Finish the quiz to use it.', 'warning')
+        if session.get('quiz_topic_id'):
+            return redirect(url_for('quiz', topic_id=session.get('quiz_topic_id')))
+        return redirect(url_for('student_dashboard'))
     conn = get_db()
-    ensure_ai_tutor_tables(conn)
     cur = conn.cursor()
     cur.execute("""
         SELECT *
@@ -1322,8 +1513,9 @@ def ai_tutor(tutor_session_id):
     if not tutor_session:
         cur.close()
         conn.close()
-        flash('AI Tutor is locked. Finish a quiz to unlock it.', 'warning')
-        return redirect(url_for('student_dashboard'))
+        flash('AI Tutor session not found. Starting a new session.', 'info')
+        tutor_session_id = ensure_general_tutor_session(session['student_id'])
+        return redirect(url_for('ai_tutor', tutor_session_id=tutor_session_id))
     cur.execute("""
         SELECT role, message_text, meta_json, created_at
         FROM ai_tutor_messages
@@ -1340,7 +1532,7 @@ def ai_tutor(tutor_session_id):
         tutor_session=tutor_session,
         messages=messages,
         wrong_questions=wrong_questions,
-        ai_tutor_locked=False,
+        ai_tutor_locked=is_quiz_active(),
         tutor_session_id=tutor_session_id
     )
 
@@ -1348,11 +1540,12 @@ def ai_tutor(tutor_session_id):
 @app.route('/api/ai-tutor/explain', methods=['POST'])
 @student_required
 def ai_tutor_explain():
+    if is_quiz_active():
+        return jsonify({'error': 'AI Tutor is locked while your quiz is running.'}), 403
     payload = request.get_json(silent=True) or {}
     tutor_session_id = payload.get('tutor_session_id', '')
     question_id = payload.get('question_id')
     conn = get_db()
-    ensure_ai_tutor_tables(conn)
     cur = conn.cursor()
     cur.execute("""
         SELECT context_json, topic_name, subject_name
@@ -1410,94 +1603,53 @@ def ai_tutor_explain():
 @app.route('/api/ai-tutor/chat', methods=['POST'])
 @student_required
 def ai_tutor_chat():
-    payload = request.get_json(silent=True) or {}
-    tutor_session_id = payload.get('tutor_session_id', '')
-    raw_text = payload.get('message', '')
-    user_text = sanitize_child_prompt(raw_text)
-    if not user_text:
-        return jsonify({'error': 'Please type a message first.'}), 400
-    conn = get_db()
-    ensure_ai_tutor_tables(conn)
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT context_json, topic_name, subject_name
-        FROM ai_tutor_sessions
-        WHERE tutor_session_id = %s AND student_id = %s
-    """, (tutor_session_id, session['student_id']))
-    tutor_session = cur.fetchone()
-    if not tutor_session:
-        cur.close()
-        conn.close()
-        return jsonify({'error': 'Tutor session not found.'}), 404
-    history = get_tutor_conversation_history(cur, tutor_session_id)
-    history.append({"role": "user", "text": user_text})
-    topic_name_val = tutor_session.get("topic_name") or tutor_session["context_json"].get("topic") or "General Studies"
-    subject_name_val = tutor_session.get("subject_name") or tutor_session["context_json"].get("subject") or "General"
-    ai_response, err = call_gemini_with_history(topic_name_val, subject_name_val, history)
-    if err:
-        cur.close()
-        conn.close()
-        return jsonify({"error": err}), 502
-    save_tutor_message(cur, tutor_session_id, "user", user_text, {"type": "chat_input"})
-    save_tutor_message(cur, tutor_session_id, "assistant", ai_response, {"type": "chat_reply", "provider": "groq"})
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({'message': ai_response})
+    if is_quiz_active():
+        return jsonify({'error': 'AI Tutor is locked while your quiz is running.'}), 403
+    # Backward-compatible wrapper for older frontend builds.
+    return ai_tutor_gemini_chat()
 
 
 @app.route('/api/ai-tutor/gemini-chat', methods=['POST'])
 @student_required
 def ai_tutor_gemini_chat():
+    if is_quiz_active():
+        return jsonify({'error': 'AI Tutor is locked while your quiz is running.'}), 403
     payload = request.get_json(silent=True) or {}
     tutor_session_id = payload.get('tutor_session_id', '')
     user_message = sanitize_child_prompt(payload.get('message', ''))
-    conversation_history = payload.get('history', [])
     if not user_message:
         return jsonify({'error': 'Please type a message first.'}), 400
-    if not isinstance(conversation_history, list):
-        return jsonify({'error': 'Invalid conversation history.'}), 400
-    conn = get_db()
-    ensure_ai_tutor_tables(conn)
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT topic_name, subject_name, context_json
-        FROM ai_tutor_sessions
-        WHERE tutor_session_id = %s AND student_id = %s
-    """, (tutor_session_id, session['student_id']))
-    tutor_session = cur.fetchone()
-    if not tutor_session:
-        cur.close()
-        conn.close()
-        return jsonify({'error': 'Tutor session not found.'}), 404
-    # Fetch history BEFORE saving new message to avoid consecutive user-role turns
-    history = get_tutor_conversation_history(cur, tutor_session_id)
-    history.append({'role': 'user', 'text': user_message})
-    ai_response, err = call_gemini_with_history(
-        tutor_session.get('topic_name') or 'General Studies',
-        tutor_session.get('subject_name') or 'General',
-        history
-    )
-    if err:
-        cur.close()
-        conn.close()
-        return jsonify({'error': err}), 502
-    # Save both only after successful Gemini response
-    save_tutor_message(cur, tutor_session_id, 'user', user_message, {'type': 'chat_input'})
-    save_tutor_message(cur, tutor_session_id, 'assistant', ai_response, {'type': 'chat_reply', 'provider': 'groq'})
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({'message': ai_response})
+    with db_cursor(commit=True) as (conn, cur):
+        cur.execute("""
+            SELECT topic_name, subject_name, context_json
+            FROM ai_tutor_sessions
+            WHERE tutor_session_id = %s AND student_id = %s
+        """, (tutor_session_id, session['student_id']))
+        tutor_session = cur.fetchone()
+        if not tutor_session:
+            return jsonify({'error': 'Tutor session not found.'}), 404
+        history = get_tutor_conversation_history(cur, tutor_session_id)
+        history.append({'role': 'user', 'text': user_message})
+        ai_response, err = call_gemini_with_history(
+            tutor_session.get('topic_name') or 'General Studies',
+            tutor_session.get('subject_name') or 'General',
+            history
+        )
+        if err:
+            return jsonify({'error': err}), 502
+        save_tutor_message(cur, tutor_session_id, 'user', user_message, {'type': 'chat_input'})
+        save_tutor_message(cur, tutor_session_id, 'assistant', ai_response, {'type': 'chat_reply', 'provider': 'groq'})
+        return jsonify({'message': ai_response})
 
 
 @app.route('/api/ai-tutor/redemption/new', methods=['POST'])
 @student_required
 def ai_tutor_redemption_new():
+    if is_quiz_active():
+        return jsonify({'error': 'AI Tutor is locked while your quiz is running.'}), 403
     payload = request.get_json(silent=True) or {}
     tutor_session_id = payload.get('tutor_session_id', '')
     conn = get_db()
-    ensure_ai_tutor_tables(conn)
     cur = conn.cursor()
     cur.execute("""
         SELECT topic_name
@@ -1561,12 +1713,13 @@ def ai_tutor_redemption_new():
 @app.route('/api/ai-tutor/redemption/answer', methods=['POST'])
 @student_required
 def ai_tutor_redemption_answer():
+    if is_quiz_active():
+        return jsonify({'error': 'AI Tutor is locked while your quiz is running.'}), 403
     payload = request.get_json(silent=True) or {}
     tutor_session_id = payload.get('tutor_session_id', '')
     redemption_id = payload.get('redemption_id')
     student_answer = sanitize_child_prompt(str(payload.get('answer', '')))
     conn = get_db()
-    ensure_ai_tutor_tables(conn)
     cur = conn.cursor()
     cur.execute("""
         SELECT r.redemption_id, r.answer_text

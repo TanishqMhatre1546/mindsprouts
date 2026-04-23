@@ -37,6 +37,7 @@
 
                         <div id="login-form">
                             <form action="{{ url_for('student_login') }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <div class="mb-3">
                                     <label class="form-label">Username</label>
                                     <div class="input-group-ms">
@@ -61,6 +62,7 @@
 
                         <div id="signup-form" style="display:none">
                             <form action="{{ url_for('signup') }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <div class="mb-3">
                                     <label class="form-label">Your Name</label>
                                     <div class="input-group-ms">
@@ -108,6 +110,7 @@
 
                     <div id="admin-panel" style="display:none">
                         <form action="{{ url_for('admin_login') }}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <div class="mb-3">
                                 <label class="form-label">Admin Username</label>
                                 <div class="input-group-ms">

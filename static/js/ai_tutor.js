@@ -6,11 +6,25 @@
     const newRedemptionBtn = document.getElementById('new-redemption-btn');
     const redemptionForm = document.getElementById('redemption-answer-form');
     const redemptionInput = document.getElementById('redemption-answer-input');
+    const ttsToggle = document.getElementById('tutor-tts-toggle');
     let activeRedemptionId = null;
     const conversation = [];
+    let ttsEnabled = false;
 
     if (!chatBox || !chatForm || !chatInput) {
         return;
+    }
+
+    if (ttsToggle) {
+        ttsToggle.addEventListener('click', () => {
+            ttsEnabled = !ttsEnabled;
+            ttsToggle.setAttribute('aria-pressed', ttsEnabled ? 'true' : 'false');
+            ttsToggle.classList.toggle('btn-warning', ttsEnabled);
+            ttsToggle.classList.toggle('btn-light', !ttsEnabled);
+            if (!ttsEnabled && window.MindSproutsVoice) {
+                window.MindSproutsVoice.stopSpeaking();
+            }
+        });
     }
 
     function addMessage(role, text) {
@@ -21,6 +35,9 @@
         chatBox.scrollTop = chatBox.scrollHeight;
         const mappedRole = role === 'assistant' ? 'model' : 'user';
         conversation.push({ role: mappedRole, text });
+        if (role === 'assistant' && ttsEnabled && window.MindSproutsVoice) {
+            window.MindSproutsVoice.speak(text, { rate: 1, pitch: 1 });
+        }
     }
 
     function buildHistoryPayload() {
@@ -42,9 +59,10 @@
     }
 
     async function postJson(url, payload) {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
         const resp = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
             body: JSON.stringify(payload)
         });
         const data = await resp.json();

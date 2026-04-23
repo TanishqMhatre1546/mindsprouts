@@ -54,6 +54,7 @@
     </div>
 
     <form id="quiz-form" action="{{ url_for('submit_quiz') }}" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="quiz_attempt_token" value="{{ session.quiz_attempt_token }}">
         {% for q in questions %}
         <div class="question-block quiz-card pop-in"

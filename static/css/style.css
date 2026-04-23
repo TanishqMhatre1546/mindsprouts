@@ -639,6 +639,21 @@ main, nav, .page-header { position: relative; z-index: 1; }
     background: white;
 }
 
+/* ── VOICE ASSIST BUTTONS ─────────────────────────────────── */
+.voice-btn {
+    border-color: rgba(124,92,252,0.18) !important;
+    color: var(--violet) !important;
+    background: #fff !important;
+}
+.voice-btn:hover {
+    background: var(--violet-pale) !important;
+}
+.voice-btn.is-listening {
+    background: var(--coral-pale) !important;
+    color: var(--coral-dark) !important;
+    border-color: rgba(255,107,107,0.35) !important;
+}
+
 /* ── LEADERBOARD ──────────────────────────────────────────── */
 .leaderboard-row { background: var(--bg-card); border: 1.5px solid var(--border); border-radius: var(--r-md); padding: 14px 20px; margin-bottom: 10px; display: flex; align-items: center; gap: 14px; box-shadow: var(--shadow-sm); transition: all 0.2s; }
 .leaderboard-row:hover { transform: translateX(5px); border-color: var(--violet); box-shadow: var(--shadow-md); }

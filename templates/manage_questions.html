@@ -21,6 +21,7 @@
             <i class="fa-solid fa-plus"></i> Add New Question
         </h5>
         <form action="{{ url_for('add_question') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="row g-3">
                 <div class="col-md-4">
                     <label class="form-label fw-bold small">Topic</label>
@@ -35,28 +36,53 @@
                 </div>
                 <div class="col-md-8">
                     <label class="form-label fw-bold small">Question</label>
-                    <input type="text" name="question_text" class="form-control"
-                           placeholder="Enter question text..." required>
+                    <div class="input-group">
+                        <input id="add_question_text" type="text" name="question_text" class="form-control"
+                               placeholder="Enter question text..." required>
+                        <button type="button" class="btn btn-light voice-btn" data-voice-target="#add_question_text" aria-label="Voice input" title="Speak">
+                            <i class="fa-solid fa-microphone"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <label class="form-label fw-bold small">Option A</label>
-                    <input type="text" name="option_a" class="form-control"
-                           placeholder="Option A" required>
+                    <div class="input-group">
+                        <input id="add_option_a" type="text" name="option_a" class="form-control"
+                               placeholder="Option A" required>
+                        <button type="button" class="btn btn-light voice-btn" data-voice-target="#add_option_a" aria-label="Voice input" title="Speak">
+                            <i class="fa-solid fa-microphone"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <label class="form-label fw-bold small">Option B</label>
-                    <input type="text" name="option_b" class="form-control"
-                           placeholder="Option B" required>
+                    <div class="input-group">
+                        <input id="add_option_b" type="text" name="option_b" class="form-control"
+                               placeholder="Option B" required>
+                        <button type="button" class="btn btn-light voice-btn" data-voice-target="#add_option_b" aria-label="Voice input" title="Speak">
+                            <i class="fa-solid fa-microphone"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <label class="form-label fw-bold small">Option C</label>
-                    <input type="text" name="option_c" class="form-control"
-                           placeholder="Option C" required>
+                    <div class="input-group">
+                        <input id="add_option_c" type="text" name="option_c" class="form-control"
+                               placeholder="Option C" required>
+                        <button type="button" class="btn btn-light voice-btn" data-voice-target="#add_option_c" aria-label="Voice input" title="Speak">
+                            <i class="fa-solid fa-microphone"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <label class="form-label fw-bold small">Option D</label>
-                    <input type="text" name="option_d" class="form-control"
-                           placeholder="Option D" required>
+                    <div class="input-group">
+                        <input id="add_option_d" type="text" name="option_d" class="form-control"
+                               placeholder="Option D" required>
+                        <button type="button" class="btn btn-light voice-btn" data-voice-target="#add_option_d" aria-label="Voice input" title="Speak">
+                            <i class="fa-solid fa-microphone"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <label class="form-label fw-bold small">Correct Answer</label>
@@ -79,10 +105,14 @@
 
     <!-- Filters -->
     <div class="d-flex gap-2 mb-3 flex-wrap">
-        <input type="text" id="searchBox" class="form-control"
-               style="max-width:300px"
-               placeholder="Search questions..."
-               oninput="filterQ()">
+        <div class="input-group" style="max-width:300px">
+            <input type="text" id="searchBox" class="form-control"
+                   placeholder="Search questions..."
+                   oninput="filterQ()">
+            <button type="button" class="btn btn-light voice-btn" data-voice-target="#searchBox" aria-label="Voice input" title="Speak">
+                <i class="fa-solid fa-microphone"></i>
+            </button>
+        </div>
         <select id="gradeFilter" class="form-select"
                 style="max-width:130px" onchange="filterQ()">
             <option value="">All Grades</option>
@@ -146,11 +176,12 @@
                                         )">
                                     <i class="fa-solid fa-pen"></i>
                                 </button>
-                                <a href="{{ url_for('delete_question', qid=q.question_id) }}"
-                                   class="btn btn-sm btn-danger"
-                                   onclick="return confirm('Delete this question?')">
-                                    <i class="fa-solid fa-trash"></i>
-                                </a>
+                                <form action="{{ url_for('delete_question', qid=q.question_id) }}" method="POST" style="display:inline" onsubmit="return confirm('Delete this question?')">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-danger">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </form>
                             </div>
                         </td>
                     </tr>
@@ -175,6 +206,7 @@
                         data-bs-dismiss="modal"></button>
             </div>
             <form id="editForm" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-12">
@@ -190,28 +222,53 @@
                         </div>
                         <div class="col-12">
                             <label class="form-label fw-bold small">Question</label>
-                            <input type="text" name="question_text"
-                                   id="edit_question" class="form-control" required>
+                            <div class="input-group">
+                                <input type="text" name="question_text"
+                                       id="edit_question" class="form-control" required>
+                                <button type="button" class="btn btn-light voice-btn" data-voice-target="#edit_question" aria-label="Voice input" title="Speak">
+                                    <i class="fa-solid fa-microphone"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="col-6">
                             <label class="form-label fw-bold small">Option A</label>
-                            <input type="text" name="option_a" id="edit_a"
-                                   class="form-control" required>
+                            <div class="input-group">
+                                <input type="text" name="option_a" id="edit_a"
+                                       class="form-control" required>
+                                <button type="button" class="btn btn-light voice-btn" data-voice-target="#edit_a" aria-label="Voice input" title="Speak">
+                                    <i class="fa-solid fa-microphone"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="col-6">
                             <label class="form-label fw-bold small">Option B</label>
-                            <input type="text" name="option_b" id="edit_b"
-                                   class="form-control" required>
+                            <div class="input-group">
+                                <input type="text" name="option_b" id="edit_b"
+                                       class="form-control" required>
+                                <button type="button" class="btn btn-light voice-btn" data-voice-target="#edit_b" aria-label="Voice input" title="Speak">
+                                    <i class="fa-solid fa-microphone"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="col-6">
                             <label class="form-label fw-bold small">Option C</label>
-                            <input type="text" name="option_c" id="edit_c"
-                                   class="form-control" required>
+                            <div class="input-group">
+                                <input type="text" name="option_c" id="edit_c"
+                                       class="form-control" required>
+                                <button type="button" class="btn btn-light voice-btn" data-voice-target="#edit_c" aria-label="Voice input" title="Speak">
+                                    <i class="fa-solid fa-microphone"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="col-6">
                             <label class="form-label fw-bold small">Option D</label>
-                            <input type="text" name="option_d" id="edit_d"
-                                   class="form-control" required>
+                            <div class="input-group">
+                                <input type="text" name="option_d" id="edit_d"
+                                       class="form-control" required>
+                                <button type="button" class="btn btn-light voice-btn" data-voice-target="#edit_d" aria-label="Voice input" title="Speak">
+                                    <i class="fa-solid fa-microphone"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="col-6">
                             <label class="form-label fw-bold small">
