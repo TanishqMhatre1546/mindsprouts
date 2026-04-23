@@ -40,6 +40,28 @@
         </button>
 
         <div class="collapse navbar-collapse" id="navMenu">
+            <!-- Mobile menu header (visible only on mobile) -->
+            <div class="mobile-nav-header d-lg-none">
+                {% if session.student_id %}
+                <div class="mobile-nav-user">
+                    <div class="mobile-nav-avatar"><i class="fa-solid fa-user"></i></div>
+                    <div>
+                        <div class="mobile-nav-name">{{ session.student_name if session.student_name else 'Student' }}</div>
+                        <div class="mobile-nav-grade">Grade {{ session.grade }}</div>
+                    </div>
+                </div>
+                <div class="mobile-nav-stats">
+                    <span class="points-badge" style="font-size:0.8rem;padding:4px 12px">
+                        <i class="fa-solid fa-star"></i> {{ session.total_points }} pts
+                    </span>
+                    {% if session.current_streak > 0 %}
+                    <span class="streak-badge" style="font-size:0.8rem;padding:4px 12px">
+                        <i class="fa-solid fa-fire"></i> {{ session.current_streak }}d
+                    </span>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
             <ul class="navbar-nav ms-auto align-items-lg-center gap-1">
 
                 {% if session.student_id %}

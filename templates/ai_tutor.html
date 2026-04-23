@@ -6,10 +6,10 @@
 
     <!-- Back navigation -->
     <div class="mb-3 d-flex gap-2 align-items-center">
-        <button onclick="history.back()" class="btn btn-sm btn-light">
+        <button onclick="history.back()" class="btn-back-header" style="margin-bottom:0">
             <i class="fa-solid fa-arrow-left"></i> Back to Results
         </button>
-        <a href="{{ url_for('student_dashboard') }}" class="btn btn-sm btn-light">
+        <a href="{{ url_for('student_dashboard') }}" class="btn-back-header btn-back-header--home" style="margin-bottom:0">
             <i class="fa-solid fa-house"></i> Dashboard
         </a>
     </div>
