@@ -360,12 +360,13 @@ REMEMBER:
 
 
 def call_gemini_with_history(topic_name, subject_name, history_items):
-    """Calls Groq API (OpenAI-compatible) with full conversation history."""
+    """Calls Groq API using requests library (avoids Cloudflare urllib blocks)."""
+    import requests as _requests
     api_key = os.environ.get('GROQ_API_KEY', '').strip()
     if not api_key:
         return None, "Missing GROQ_API_KEY — please set it in Render environment variables."
     model_name = os.environ.get('GROQ_MODEL', 'llama-3.3-70b-versatile')
-    # Build messages list — Groq uses OpenAI format: role = 'user' or 'assistant'
+    # Build messages — Groq uses OpenAI format: system / user / assistant
     messages = [
         {"role": "system", "content": build_gemini_system_prompt(topic_name, subject_name)}
     ]
@@ -374,18 +375,16 @@ def call_gemini_with_history(topic_name, subject_name, history_items):
         text = sanitize_for_gemini_text(item.get('text', ''))
         if not text:
             continue
-        # Map 'model' role (Gemini format) to 'assistant' (OpenAI/Groq format)
         groq_role = 'assistant' if role == 'model' else 'user'
         messages.append({"role": groq_role, "content": text})
-    # Merge consecutive same-role messages — Groq requires alternating turns
-    merged = [messages[0]]  # keep system message
+    # Merge consecutive same-role messages
+    merged = [messages[0]]
     for msg in messages[1:]:
         if merged[-1]['role'] == msg['role'] and merged[-1]['role'] != 'system':
             merged[-1]['content'] += '\n' + msg['content']
         else:
             merged.append(msg)
     messages = merged
-    # Make sure last message is from user
     if not messages or messages[-1]['role'] != 'user':
         return None, "No user message to send"
     payload = {
@@ -398,22 +397,22 @@ def call_gemini_with_history(topic_name, subject_name, history_items):
         app.logger.info("groq_payload roles=%s", [m['role'] for m in messages])
     except Exception:
         pass
-    endpoint = "https://api.groq.com/openai/v1/chat/completions"
-    req = urlrequest.Request(
-        endpoint,
-        data=json.dumps(payload).encode('utf-8'),
-        method='POST',
-        headers={
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {api_key}'
-        }
-    )
     try:
-        with urlrequest.urlopen(req, timeout=20) as resp:
-            body = resp.read().decode('utf-8')
-        parsed = json.loads(body)
+        resp = _requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            json=payload,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            timeout=20
+        )
+        if not resp.ok:
+            app.logger.error("groq_http_error status=%s body=%s", resp.status_code, resp.text[:400])
+            return None, f"Groq request failed ({resp.status_code}): {resp.text[:300]}"
+        data = resp.json()
         text = (
-            parsed.get('choices', [{}])[0]
+            data.get('choices', [{}])[0]
             .get('message', {})
             .get('content', '')
             .strip()
@@ -421,17 +420,9 @@ def call_gemini_with_history(topic_name, subject_name, history_items):
         if not text:
             return None, "Groq returned empty response"
         return text, None
-    except urlerror.HTTPError as http_err:
-        try:
-            body = http_err.read().decode('utf-8')
-        except Exception:
-            body = ''
-        app.logger.error("groq_chat_http_error status=%s body=%s", http_err.code, body)
-        short_reason = body[:400] if body else 'no body'
-        return None, "Groq request failed (" + str(http_err.code) + "): " + short_reason
-    except Exception:
+    except Exception as e:
         app.logger.exception("groq_chat_failed")
-        return None, "Groq request failed"
+        return None, f"Groq request failed: {str(e)}"
 
 def ensure_app_settings_table(conn):
     cur = conn.cursor()
