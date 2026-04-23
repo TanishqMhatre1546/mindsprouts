@@ -14,10 +14,7 @@
             </div>
             <div>
                 <h1 class="mb-0">{{ subject.subject_name }}</h1>
-                <p class="mb-0 opacity-75">
-                    Grade {{ session.grade }} —
-                    {{ attempted|length }}/{{ topics|length }} topics attempted
-                </p>
+                <p class="mb-0 opacity-75">Grade {{ session.grade }} — {{ attempted|length }}/{{ topics|length }} topics attempted</p>
             </div>
         </div>
     </div>

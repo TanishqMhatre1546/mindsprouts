@@ -13,6 +13,7 @@ import json
 import re
 import threading
 from urllib import request as urlrequest
+from urllib import error as urlerror
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -128,6 +129,17 @@ def sanitize_child_prompt(text):
     cleaned = (text or "").strip()
     cleaned = re.sub(r"\s+", " ", cleaned)
     return cleaned[:MAX_TUTOR_CHAT_CHARS]
+
+
+def sanitize_for_gemini_text(text):
+    # Keep it as plain text, remove control chars that can break JSON/payload parsing.
+    raw = (text or "")
+    raw = raw.replace("`", "")
+    raw = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", raw)
+    raw = raw.strip()
+    raw = re.sub(r"\s+\n", "\n", raw)
+    raw = re.sub(r"\n\s+", "\n", raw)
+    return raw
 
 
 def ensure_ai_tutor_tables(conn):
@@ -295,89 +307,23 @@ def save_tutor_message(cur, tutor_session_id, role, message_text, meta=None):
     """, (tutor_session_id, role, message_text, json.dumps(meta or {})))
 
 
-def get_last_assistant_message(cur, tutor_session_id):
+def get_tutor_conversation_history(cur, tutor_session_id):
     cur.execute("""
-        SELECT message_text
+        SELECT role, message_text
         FROM ai_tutor_messages
-        WHERE tutor_session_id = %s AND role = 'assistant'
+        WHERE tutor_session_id = %s
         ORDER BY created_at DESC, message_id DESC
-        LIMIT 1
+        LIMIT 100
     """, (tutor_session_id,))
-    row = cur.fetchone()
-    if row:
-        return row['message_text']
-    return ""
-
-
-def build_rule_based_tutor_reply(context_payload, user_text):
-    lower = (user_text or "").lower().strip()
-    topic_name = context_payload.get('topic', 'this topic')
-    wrong_questions = [q for q in context_payload.get('questions', []) if not q.get('is_correct')]
-    target = wrong_questions[0] if wrong_questions else None
-
-    if any(token in lower for token in ['cm2', 'cm^2', 'sq cm', 'square cm', 'why cm']):
-        return (
-            "Great question! `cm` is for length (one line). `cm2` means square centimeters, which is for area.\n"
-            "Area measures space inside a shape, so we use square units.\n"
-            "Quick example: a 2 cm by 3 cm rectangle has area 6 cm2."
-        )
-
-    if any(token in lower for token in ['why wrong', 'why my answer', 'why is my answer', 'why q', 'wrong in q']):
-        if target:
-            return (
-                f"Your answer was wrong because the unit or operation did not match the question.\n"
-                f"For this one, you chose {target.get('selected_option')}) {target.get('selected_answer')}, "
-                f"but the correct answer is {target.get('correct_option')}) {target.get('correct_answer')}.\n"
-                "Tip: first decide what the question asks (length, area, or perimeter), then choose the unit."
-            )
-        return "Let's check one wrong question together. Tap an `Explain Q` button and I will break it down step by step."
-
-    if any(token in lower for token in ['ok', 'okay', 'hmm', 'got it', 'continue', 'next']):
-        return (
-            "Awesome! Let's do one tiny check-in: when do we use `cm2`?\n"
-            "A) Length of a line\n"
-            "B) Area inside a shape\n"
-            "Reply with A or B."
-        )
-
-    if any(token in lower for token in ['example', 'real life', 'in real life']):
-        return (
-            "Think about floor tiles in a room.\n"
-            "If each tile covers 1 square unit, counting tiles gives area.\n"
-            "That is why area uses square units like cm2."
-        )
-
-    if any(token in lower for token in ['easy', 'easier', 'simple', 'simpler']):
-        return (
-            "Let's try an easier one: A shape is 4 cm long and 2 cm wide.\n"
-            "What is its area? (Hint: length x width)"
-        )
-
-    if any(token in lower for token in ['dont understand', "don't understand", 'confused']):
-        return (
-            "No worries, you are doing great. 🙂\n"
-            "Step 1: Find what is asked.\n"
-            "Step 2: Pick the correct operation.\n"
-            "Step 3: Pick the correct unit.\n"
-            f"We can practice this with one {topic_name} question now."
-        )
-
-    return (
-        "Nice question. Tell me what part is tricky: unit, formula, or final step.\n"
-        "I will explain just that part in a simple way."
-    )
-
-
-def dedupe_tutor_reply(reply_text, last_assistant_text):
-    if not last_assistant_text:
-        return reply_text
-    if reply_text.strip().lower() != last_assistant_text.strip().lower():
-        return reply_text
-    return (
-        "Let's do it a different way.\n"
-        "Can you share the exact part that feels confusing?\n"
-        "I can explain with a picture idea, a real-life example, or one tiny practice question."
-    )
+    rows = cur.fetchall()
+    rows.reverse()
+    history = []
+    for row in rows:
+        role = 'model' if row.get('role') == 'assistant' else 'user'
+        text = sanitize_for_gemini_text(row.get('message_text', ''))
+        if text:
+            history.append({'role': role, 'text': text})
+    return history
 
 
 def build_gemini_system_prompt(topic_name, subject_name):
@@ -416,14 +362,17 @@ REMEMBER:
 
 
 def call_gemini_with_history(topic_name, subject_name, history_items):
-    api_key = os.environ.get('GEMINI_API_KEY', '').strip()
+    api_key = (
+        os.environ.get('GEMINI_API_KEY', '').strip()
+        or os.environ.get('GOOGLE_API_KEY', '').strip()
+    )
     if not api_key:
-        return None, "Missing GEMINI_API_KEY"
-    model_name = os.environ.get('GEMINI_MODEL', 'gemini-1.5-flash')
+        return None, "Missing GEMINI_API_KEY (or GOOGLE_API_KEY)"
+    model_name = os.environ.get('GEMINI_MODEL', 'gemini-2.0-flash')
     contents = []
     for item in history_items:
         role = item.get('role', 'user')
-        text = sanitize_child_prompt(item.get('text', ''))
+        text = sanitize_for_gemini_text(item.get('text', ''))
         if not text:
             continue
         gemini_role = 'model' if role == 'model' else 'user'
@@ -431,6 +380,9 @@ def call_gemini_with_history(topic_name, subject_name, history_items):
             "role": gemini_role,
             "parts": [{"text": text}]
         })
+    # Gemini requests are more reliable when the first turn is from the user.
+    while contents and contents[0].get('role') == 'model':
+        contents.pop(0)
     if not contents:
         return None, "Empty conversation history"
     payload = {
@@ -439,6 +391,11 @@ def call_gemini_with_history(topic_name, subject_name, history_items):
         },
         "contents": contents
     }
+    # Log payload for debugging (safe: no API key included).
+    try:
+        app.logger.info("gemini_payload %s", json.dumps(payload, ensure_ascii=False)[:6000])
+    except Exception:
+        app.logger.exception("gemini_payload_log_failed")
     endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
     req = urlrequest.Request(
         endpoint,
@@ -460,6 +417,13 @@ def call_gemini_with_history(topic_name, subject_name, history_items):
         if not text:
             return None, "Gemini returned empty response"
         return text, None
+    except urlerror.HTTPError as http_err:
+        try:
+            body = http_err.read().decode('utf-8')
+        except Exception:
+            body = ''
+        app.logger.error("gemini_chat_http_error status=%s body=%s", http_err.code, body)
+        return None, f"Gemini request failed ({http_err.code})"
     except Exception:
         app.logger.exception("gemini_chat_failed")
         return None, "Gemini request failed"
@@ -555,6 +519,7 @@ def super_admin_required(f):
             return redirect(url_for('admin_dashboard'))
         return f(*args, **kwargs)
     return decorated
+
 
 @app.before_request
 def log_request_start():
@@ -1087,6 +1052,25 @@ def update_quiz_duration():
     flash('Quiz duration updated successfully.', 'success')
     return redirect(url_for('admin_dashboard'))
 
+
+@app.route('/admin/ai-diagnostics')
+@admin_required
+def admin_ai_diagnostics():
+    has_gemini_key = bool(os.environ.get('GEMINI_API_KEY', '').strip())
+    has_google_key = bool(os.environ.get('GOOGLE_API_KEY', '').strip())
+    return jsonify({
+        'ok': True,
+        'gemini': {
+            'key_configured': has_gemini_key or has_google_key,
+            'key_source': 'GEMINI_API_KEY' if has_gemini_key else ('GOOGLE_API_KEY' if has_google_key else None),
+            'model': os.environ.get('GEMINI_MODEL', 'gemini-2.0-flash')
+        },
+        'database_pool': {
+            'min': max(1, int(os.environ.get('DATABASE_POOL_MIN', 1))),
+            'max': max(max(1, int(os.environ.get('DATABASE_POOL_MIN', 1))), int(os.environ.get('DATABASE_POOL_MAX', 12)))
+        }
+    }), 200
+
 @app.route('/admin/questions')
 @admin_required
 def manage_questions():
@@ -1376,7 +1360,7 @@ def ai_tutor_explain():
     ensure_ai_tutor_tables(conn)
     cur = conn.cursor()
     cur.execute("""
-        SELECT context_json
+        SELECT context_json, topic_name, subject_name
         FROM ai_tutor_sessions
         WHERE tutor_session_id = %s AND student_id = %s
     """, (tutor_session_id, session['student_id']))
@@ -1395,15 +1379,32 @@ def ai_tutor_explain():
         cur.close()
         conn.close()
         return jsonify({'error': 'Question not found for this session.'}), 404
-    explainer = (
-        f"Let's solve this step by step. ✨\n"
-        f"Question: {selected['question_text']}\n"
-        f"You chose: {selected['selected_option']}) {selected['selected_answer']}\n"
-        f"Correct answer: {selected['correct_option']}) {selected['correct_answer']}\n"
-        "Tip: Read the question slowly, then remove two wrong options first.\n"
-        f"Easier one: Can you solve a simpler {context.get('topic', 'practice')} example now?"
+    question_text = selected.get('question_text') or "Unknown question"
+    student_answer = selected.get('selected_answer') or "No answer given"
+    correct_answer = selected.get('correct_answer') or "Unknown"
+    explain_prompt = (
+        "The student got this question wrong.\n"
+        f"Question: {question_text}\n"
+        f"Student answered: {student_answer}\n"
+        f"Correct answer: {correct_answer}\n"
+        "Please explain clearly and simply why the correct answer is right\n"
+        "and why the student's answer is wrong. Use simple language for a\n"
+        "primary school kid aged 6-12."
     )
-    save_tutor_message(cur, tutor_session_id, 'assistant', explainer, {'type': 'question_explanation', 'question_id': question_id})
+    explain_prompt = sanitize_for_gemini_text(explain_prompt)
+    save_tutor_message(cur, tutor_session_id, 'user', explain_prompt, {'type': 'question_explain_request', 'question_id': question_id})
+    history = get_tutor_conversation_history(cur, tutor_session_id)
+    explainer, err = call_gemini_with_history(
+        tutor_session.get('topic_name') or context.get('topic') or 'General Studies',
+        tutor_session.get('subject_name') or context.get('subject') or 'General',
+        history
+    )
+    if err:
+        conn.rollback()
+        cur.close()
+        conn.close()
+        return jsonify({'error': err}), 502
+    save_tutor_message(cur, tutor_session_id, 'assistant', explainer, {'type': 'question_explanation', 'question_id': question_id, 'provider': 'gemini'})
     conn.commit()
     cur.close()
     conn.close()
@@ -1423,7 +1424,7 @@ def ai_tutor_chat():
     ensure_ai_tutor_tables(conn)
     cur = conn.cursor()
     cur.execute("""
-        SELECT context_json
+        SELECT context_json, topic_name, subject_name
         FROM ai_tutor_sessions
         WHERE tutor_session_id = %s AND student_id = %s
     """, (tutor_session_id, session['student_id']))
@@ -1433,11 +1434,18 @@ def ai_tutor_chat():
         conn.close()
         return jsonify({'error': 'Tutor session not found.'}), 404
     save_tutor_message(cur, tutor_session_id, 'user', user_text, {'type': 'chat_input'})
-    last_assistant_message = get_last_assistant_message(cur, tutor_session_id)
-    fallback = build_rule_based_tutor_reply(tutor_session['context_json'], user_text)
-    ai_response = call_external_ai_if_available(tutor_session['context_json'], user_text) or fallback
-    ai_response = dedupe_tutor_reply(ai_response, last_assistant_message)
-    save_tutor_message(cur, tutor_session_id, 'assistant', ai_response, {'type': 'chat_reply'})
+    history = get_tutor_conversation_history(cur, tutor_session_id)
+    ai_response, err = call_gemini_with_history(
+        tutor_session.get('topic_name') or tutor_session['context_json'].get('topic') or 'General Studies',
+        tutor_session.get('subject_name') or tutor_session['context_json'].get('subject') or 'General',
+        history
+    )
+    if err:
+        conn.rollback()
+        cur.close()
+        conn.close()
+        return jsonify({'error': err}), 502
+    save_tutor_message(cur, tutor_session_id, 'assistant', ai_response, {'type': 'chat_reply', 'provider': 'gemini'})
     conn.commit()
     cur.close()
     conn.close()
@@ -1459,7 +1467,7 @@ def ai_tutor_gemini_chat():
     ensure_ai_tutor_tables(conn)
     cur = conn.cursor()
     cur.execute("""
-        SELECT topic_name, subject_name
+        SELECT topic_name, subject_name, context_json
         FROM ai_tutor_sessions
         WHERE tutor_session_id = %s AND student_id = %s
     """, (tutor_session_id, session['student_id']))
@@ -1469,18 +1477,17 @@ def ai_tutor_gemini_chat():
         conn.close()
         return jsonify({'error': 'Tutor session not found.'}), 404
     save_tutor_message(cur, tutor_session_id, 'user', user_message, {'type': 'chat_input'})
+    history = get_tutor_conversation_history(cur, tutor_session_id)
     ai_response, err = call_gemini_with_history(
         tutor_session.get('topic_name') or 'General Studies',
         tutor_session.get('subject_name') or 'General',
-        conversation_history
+        history
     )
     if err:
         conn.rollback()
         cur.close()
         conn.close()
         return jsonify({'error': err}), 502
-    last_assistant_message = get_last_assistant_message(cur, tutor_session_id)
-    ai_response = dedupe_tutor_reply(ai_response, last_assistant_message)
     save_tutor_message(cur, tutor_session_id, 'assistant', ai_response, {'type': 'chat_reply', 'provider': 'gemini'})
     conn.commit()
     cur.close()
