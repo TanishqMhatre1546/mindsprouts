@@ -1392,18 +1392,19 @@ def ai_tutor_explain():
         "primary school kid aged 6-12."
     )
     explain_prompt = sanitize_for_gemini_text(explain_prompt)
-    save_tutor_message(cur, tutor_session_id, 'user', explain_prompt, {'type': 'question_explain_request', 'question_id': question_id})
+    # Get history BEFORE saving the new message to avoid duplicate/consecutive user messages
     history = get_tutor_conversation_history(cur, tutor_session_id)
-    explainer, err = call_gemini_with_history(
-        tutor_session.get('topic_name') or context.get('topic') or 'General Studies',
-        tutor_session.get('subject_name') or context.get('subject') or 'General',
-        history
-    )
+    # Append the explain prompt as the next user turn directly into history list
+    history.append({'role': 'user', 'text': explain_prompt})
+    topic_name_val = tutor_session.get('topic_name') or context.get('topic') or 'General Studies'
+    subject_name_val = tutor_session.get('subject_name') or context.get('subject') or 'General'
+    explainer, err = call_gemini_with_history(topic_name_val, subject_name_val, history)
     if err:
-        conn.rollback()
         cur.close()
         conn.close()
         return jsonify({'error': err}), 502
+    # Save both messages only after successful Gemini response
+    save_tutor_message(cur, tutor_session_id, 'user', explain_prompt, {'type': 'question_explain_request', 'question_id': question_id})
     save_tutor_message(cur, tutor_session_id, 'assistant', explainer, {'type': 'question_explanation', 'question_id': question_id, 'provider': 'gemini'})
     conn.commit()
     cur.close()
@@ -1433,19 +1434,17 @@ def ai_tutor_chat():
         cur.close()
         conn.close()
         return jsonify({'error': 'Tutor session not found.'}), 404
-    save_tutor_message(cur, tutor_session_id, 'user', user_text, {'type': 'chat_input'})
     history = get_tutor_conversation_history(cur, tutor_session_id)
-    ai_response, err = call_gemini_with_history(
-        tutor_session.get('topic_name') or tutor_session['context_json'].get('topic') or 'General Studies',
-        tutor_session.get('subject_name') or tutor_session['context_json'].get('subject') or 'General',
-        history
-    )
+    history.append({"role": "user", "text": user_text})
+    topic_name_val = tutor_session.get("topic_name") or tutor_session["context_json"].get("topic") or "General Studies"
+    subject_name_val = tutor_session.get("subject_name") or tutor_session["context_json"].get("subject") or "General"
+    ai_response, err = call_gemini_with_history(topic_name_val, subject_name_val, history)
     if err:
-        conn.rollback()
         cur.close()
         conn.close()
-        return jsonify({'error': err}), 502
-    save_tutor_message(cur, tutor_session_id, 'assistant', ai_response, {'type': 'chat_reply', 'provider': 'gemini'})
+        return jsonify({"error": err}), 502
+    save_tutor_message(cur, tutor_session_id, "user", user_text, {"type": "chat_input"})
+    save_tutor_message(cur, tutor_session_id, "assistant", ai_response, {"type": "chat_reply", "provider": "gemini"})
     conn.commit()
     cur.close()
     conn.close()
