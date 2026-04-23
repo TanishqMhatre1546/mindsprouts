@@ -379,6 +379,14 @@ def call_gemini_with_history(topic_name, subject_name, history_items):
             "role": gemini_role,
             "parts": [{"text": text}]
         })
+    # Merge consecutive same-role messages — Gemini requires strictly alternating turns.
+    merged = []
+    for turn in contents:
+        if merged and merged[-1]['role'] == turn['role']:
+            merged[-1]['parts'][0]['text'] += ' ' + turn['parts'][0]['text']
+        else:
+            merged.append(turn)
+    contents = merged
     # Gemini requests are more reliable when the first turn is from the user.
     while contents and contents[0].get('role') == 'model':
         contents.pop(0)
@@ -1474,18 +1482,20 @@ def ai_tutor_gemini_chat():
         cur.close()
         conn.close()
         return jsonify({'error': 'Tutor session not found.'}), 404
-    save_tutor_message(cur, tutor_session_id, 'user', user_message, {'type': 'chat_input'})
+    # Fetch history BEFORE saving new message to avoid consecutive user-role turns
     history = get_tutor_conversation_history(cur, tutor_session_id)
+    history.append({'role': 'user', 'text': user_message})
     ai_response, err = call_gemini_with_history(
         tutor_session.get('topic_name') or 'General Studies',
         tutor_session.get('subject_name') or 'General',
         history
     )
     if err:
-        conn.rollback()
         cur.close()
         conn.close()
         return jsonify({'error': err}), 502
+    # Save both only after successful Gemini response
+    save_tutor_message(cur, tutor_session_id, 'user', user_message, {'type': 'chat_input'})
     save_tutor_message(cur, tutor_session_id, 'assistant', ai_response, {'type': 'chat_reply', 'provider': 'gemini'})
     conn.commit()
     cur.close()
