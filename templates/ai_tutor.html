@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block title %}AI Tutor - MindSprouts{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:860px">
+    <div class="tutor-chat-shell">
+        <div class="tutor-chat-head">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <h5 class="mb-0"><i class="fa-solid fa-robot"></i> AI Tutor</h5>
+                    <small class="text-muted">{{ tutor_session.subject_name }} · {{ tutor_session.topic_name }}</small>
+                </div>
+                <span class="badge" style="background:#eef2ff;color:#4f46e5">Quiz {{ tutor_session.score }}/{{ tutor_session.total_questions }}</span>
+            </div>
+        </div>
+
+        <div id="tutor-chat-messages" class="tutor-chat-messages">
+            {% for msg in messages %}
+            <div class="tutor-msg {{ msg.role }}">
+                {{ msg.message_text }}
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="tutor-tools">
+            {% if wrong_questions %}
+                {% for q in wrong_questions %}
+                <button type="button" class="btn btn-sm btn-light explain-btn" data-question-id="{{ q.question_id }}">
+                    Explain Q{{ loop.index }}
+                </button>
+                {% endfor %}
+            {% endif %}
+            <button type="button" class="btn btn-sm btn-warning" id="new-redemption-btn">
+                <i class="fa-solid fa-bolt"></i> Level-Up Challenge
+            </button>
+        </div>
+
+        <div class="tutor-input-wrap">
+            <form id="tutor-chat-form" class="d-flex gap-2">
+                <input id="tutor-chat-input" type="text" maxlength="400" class="form-control" placeholder="Ask for help, examples, or an easier question..." />
+                <button class="btn-primary-ms" type="submit">Send</button>
+            </form>
+            <form id="redemption-answer-form" class="d-flex gap-2 mt-2" style="display:none !important">
+                <input id="redemption-answer-input" type="text" class="form-control" placeholder="Type your challenge answer" />
+                <button class="btn-outline-ms" type="submit">Check</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const tutorSessionId = "{{ tutor_session.tutor_session_id }}";
+const presetQuestionId = "{{ request.args.get('question_id', '') }}";
+const tutorTopicName = {{ tutor_session.topic_name|tojson }};
+const tutorSubjectName = {{ tutor_session.subject_name|tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/ai_tutor.js') }}"></script>
+{% endblock %}
