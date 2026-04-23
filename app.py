@@ -312,11 +312,10 @@ def get_tutor_conversation_history(cur, tutor_session_id):
         SELECT role, message_text
         FROM ai_tutor_messages
         WHERE tutor_session_id = %s
-        ORDER BY created_at DESC, message_id DESC
+        ORDER BY created_at ASC, message_id ASC
         LIMIT 100
     """, (tutor_session_id,))
     rows = cur.fetchall()
-    rows.reverse()
     history = []
     for row in rows:
         role = 'model' if row.get('role') == 'assistant' else 'user'
@@ -430,7 +429,8 @@ def call_gemini_with_history(topic_name, subject_name, history_items):
         except Exception:
             body = ''
         app.logger.error("gemini_chat_http_error status=%s body=%s", http_err.code, body)
-        return None, f"Gemini request failed ({http_err.code})"
+        short_reason = body[:400] if body else 'no body'
+        return None, "Gemini request failed (" + str(http_err.code) + "): " + short_reason
     except Exception:
         app.logger.exception("gemini_chat_failed")
         return None, "Gemini request failed"
