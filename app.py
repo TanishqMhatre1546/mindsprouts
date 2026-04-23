@@ -360,80 +360,78 @@ REMEMBER:
 
 
 def call_gemini_with_history(topic_name, subject_name, history_items):
-    api_key = (
-        os.environ.get('GEMINI_API_KEY', '').strip()
-        or os.environ.get('GOOGLE_API_KEY', '').strip()
-    )
+    """Calls Groq API (OpenAI-compatible) with full conversation history."""
+    api_key = os.environ.get('GROQ_API_KEY', '').strip()
     if not api_key:
-        return None, "Missing GEMINI_API_KEY (or GOOGLE_API_KEY)"
-    model_name = os.environ.get('GEMINI_MODEL', 'gemini-2.0-flash')
-    contents = []
+        return None, "Missing GROQ_API_KEY — please set it in Render environment variables."
+    model_name = os.environ.get('GROQ_MODEL', 'llama-3.3-70b-versatile')
+    # Build messages list — Groq uses OpenAI format: role = 'user' or 'assistant'
+    messages = [
+        {"role": "system", "content": build_gemini_system_prompt(topic_name, subject_name)}
+    ]
     for item in history_items:
         role = item.get('role', 'user')
         text = sanitize_for_gemini_text(item.get('text', ''))
         if not text:
             continue
-        gemini_role = 'model' if role == 'model' else 'user'
-        contents.append({
-            "role": gemini_role,
-            "parts": [{"text": text}]
-        })
-    # Merge consecutive same-role messages — Gemini requires strictly alternating turns.
-    merged = []
-    for turn in contents:
-        if merged and merged[-1]['role'] == turn['role']:
-            merged[-1]['parts'][0]['text'] = merged[-1]['parts'][0]['text'] + ' ' + turn['parts'][0]['text']
+        # Map 'model' role (Gemini format) to 'assistant' (OpenAI/Groq format)
+        groq_role = 'assistant' if role == 'model' else 'user'
+        messages.append({"role": groq_role, "content": text})
+    # Merge consecutive same-role messages — Groq requires alternating turns
+    merged = [messages[0]]  # keep system message
+    for msg in messages[1:]:
+        if merged[-1]['role'] == msg['role'] and merged[-1]['role'] != 'system':
+            merged[-1]['content'] += '\n' + msg['content']
         else:
-            merged.append(turn)
-    contents = merged
-    # Gemini requires the first turn to be from the user.
-    while contents and contents[0].get('role') == 'model':
-        contents.pop(0)
-    if not contents:
-        return None, "Empty conversation history"
+            merged.append(msg)
+    messages = merged
+    # Make sure last message is from user
+    if not messages or messages[-1]['role'] != 'user':
+        return None, "No user message to send"
     payload = {
-        "system_instruction": {
-            "parts": [{"text": build_gemini_system_prompt(topic_name, subject_name)}]
-        },
-        "contents": contents
+        "model": model_name,
+        "messages": messages,
+        "temperature": 0.7,
+        "max_tokens": 512,
     }
-    # Log payload for debugging (safe: no API key included).
     try:
-        app.logger.info("gemini_payload %s", json.dumps(payload, ensure_ascii=False)[:6000])
+        app.logger.info("groq_payload roles=%s", [m['role'] for m in messages])
     except Exception:
-        app.logger.exception("gemini_payload_log_failed")
-    endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+        pass
+    endpoint = "https://api.groq.com/openai/v1/chat/completions"
     req = urlrequest.Request(
         endpoint,
         data=json.dumps(payload).encode('utf-8'),
         method='POST',
-        headers={'Content-Type': 'application/json'}
+        headers={
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {api_key}'
+        }
     )
     try:
-        with urlrequest.urlopen(req, timeout=18) as resp:
+        with urlrequest.urlopen(req, timeout=20) as resp:
             body = resp.read().decode('utf-8')
         parsed = json.loads(body)
         text = (
-            parsed.get('candidates', [{}])[0]
-            .get('content', {})
-            .get('parts', [{}])[0]
-            .get('text', '')
+            parsed.get('choices', [{}])[0]
+            .get('message', {})
+            .get('content', '')
             .strip()
         )
         if not text:
-            return None, "Gemini returned empty response"
+            return None, "Groq returned empty response"
         return text, None
     except urlerror.HTTPError as http_err:
         try:
             body = http_err.read().decode('utf-8')
         except Exception:
             body = ''
-        app.logger.error("gemini_chat_http_error status=%s body=%s", http_err.code, body)
+        app.logger.error("groq_chat_http_error status=%s body=%s", http_err.code, body)
         short_reason = body[:400] if body else 'no body'
-        return None, "Gemini request failed (" + str(http_err.code) + "): " + short_reason
+        return None, "Groq request failed (" + str(http_err.code) + "): " + short_reason
     except Exception:
-        app.logger.exception("gemini_chat_failed")
-        return None, "Gemini request failed"
+        app.logger.exception("groq_chat_failed")
+        return None, "Groq request failed"
 
 def ensure_app_settings_table(conn):
     cur = conn.cursor()
@@ -1063,14 +1061,13 @@ def update_quiz_duration():
 @app.route('/admin/ai-diagnostics')
 @admin_required
 def admin_ai_diagnostics():
-    has_gemini_key = bool(os.environ.get('GEMINI_API_KEY', '').strip())
-    has_google_key = bool(os.environ.get('GOOGLE_API_KEY', '').strip())
+    has_groq_key = bool(os.environ.get('GROQ_API_KEY', '').strip())
     return jsonify({
         'ok': True,
-        'gemini': {
-            'key_configured': has_gemini_key or has_google_key,
-            'key_source': 'GEMINI_API_KEY' if has_gemini_key else ('GOOGLE_API_KEY' if has_google_key else None),
-            'model': os.environ.get('GEMINI_MODEL', 'gemini-2.0-flash')
+        'groq': {
+            'key_configured': has_groq_key,
+            'key_source': 'GROQ_API_KEY' if has_groq_key else None,
+            'model': os.environ.get('GROQ_MODEL', 'llama-3.3-70b-versatile')
         },
         'database_pool': {
             'min': max(1, int(os.environ.get('DATABASE_POOL_MIN', 1))),
@@ -1412,7 +1409,7 @@ def ai_tutor_explain():
         return jsonify({'error': err}), 502
     # Save both messages only after successful Gemini response
     save_tutor_message(cur, tutor_session_id, 'user', explain_prompt, {'type': 'question_explain_request', 'question_id': question_id})
-    save_tutor_message(cur, tutor_session_id, 'assistant', explainer, {'type': 'question_explanation', 'question_id': question_id, 'provider': 'gemini'})
+    save_tutor_message(cur, tutor_session_id, 'assistant', explainer, {'type': 'question_explanation', 'question_id': question_id, 'provider': 'groq'})
     conn.commit()
     cur.close()
     conn.close()
@@ -1451,7 +1448,7 @@ def ai_tutor_chat():
         conn.close()
         return jsonify({"error": err}), 502
     save_tutor_message(cur, tutor_session_id, "user", user_text, {"type": "chat_input"})
-    save_tutor_message(cur, tutor_session_id, "assistant", ai_response, {"type": "chat_reply", "provider": "gemini"})
+    save_tutor_message(cur, tutor_session_id, "assistant", ai_response, {"type": "chat_reply", "provider": "groq"})
     conn.commit()
     cur.close()
     conn.close()
@@ -1496,7 +1493,7 @@ def ai_tutor_gemini_chat():
         return jsonify({'error': err}), 502
     # Save both only after successful Gemini response
     save_tutor_message(cur, tutor_session_id, 'user', user_message, {'type': 'chat_input'})
-    save_tutor_message(cur, tutor_session_id, 'assistant', ai_response, {'type': 'chat_reply', 'provider': 'gemini'})
+    save_tutor_message(cur, tutor_session_id, 'assistant', ai_response, {'type': 'chat_reply', 'provider': 'groq'})
     conn.commit()
     cur.close()
     conn.close()
