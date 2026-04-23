@@ -383,11 +383,11 @@ def call_gemini_with_history(topic_name, subject_name, history_items):
     merged = []
     for turn in contents:
         if merged and merged[-1]['role'] == turn['role']:
-            merged[-1]['parts'][0]['text'] += ' ' + turn['parts'][0]['text']
+            merged[-1]['parts'][0]['text'] = merged[-1]['parts'][0]['text'] + ' ' + turn['parts'][0]['text']
         else:
             merged.append(turn)
     contents = merged
-    # Gemini requests are more reliable when the first turn is from the user.
+    # Gemini requires the first turn to be from the user.
     while contents and contents[0].get('role') == 'model':
         contents.pop(0)
     if not contents:
@@ -1521,22 +1521,53 @@ def ai_tutor_redemption_new():
         cur.close()
         conn.close()
         return jsonify({'error': 'Tutor session not found.'}), 404
-    a = random.randint(2, 12)
-    b = random.randint(2, 10)
-    question_text = f"Level-Up Challenge: What is {a} x {b}?"
-    answer_text = str(a * b)
+    topic_name_val = tutor_session.get('topic_name') or 'General Studies'
+    subject_name_val = tutor_session.get('subject_name') or 'General'
+    # Use Gemini to generate a topic-relevant challenge question
+    gen_prompt = (
+        'Generate one short quiz question for a primary school student (Grade 1-5) '
+        'about the topic "' + topic_name_val + '" (Subject: ' + subject_name_val + '). '
+        'The question must be clear, simple, and have a single correct short answer '
+        '(a word, number, or short phrase). '
+        'Respond ONLY with a valid JSON object in this exact format with no extra text or markdown: '
+        '{"question": "your question here", "answer": "the answer here"}'
+    )
+    gemini_history = [{'role': 'user', 'text': gen_prompt}]
+    raw_response, gen_err = call_gemini_with_history(topic_name_val, subject_name_val, gemini_history)
+    question_text = None
+    answer_text = None
+    if raw_response and not gen_err:
+        try:
+            clean = raw_response.strip()
+            # Strip markdown code fences if present
+            if clean.startswith('```'):
+                clean = clean.split('```')[1]
+                if clean.startswith('json'):
+                    clean = clean[4:]
+            clean = clean.strip()
+            parsed = json.loads(clean)
+            question_text = str(parsed.get('question', '')).strip()
+            answer_text = str(parsed.get('answer', '')).strip().lower()
+        except Exception:
+            app.logger.warning('redemption_parse_failed raw=%s', raw_response[:300])
+    if not question_text or not answer_text:
+        # Fallback: simple multiplication
+        a = random.randint(2, 12)
+        b = random.randint(2, 10)
+        question_text = 'What is ' + str(a) + ' x ' + str(b) + '?'
+        answer_text = str(a * b)
+    display_text = 'Level-Up Challenge: ' + question_text
     cur.execute("""
         INSERT INTO ai_tutor_redemptions (tutor_session_id, question_text, answer_text)
         VALUES (%s, %s, %s)
         RETURNING redemption_id
-    """, (tutor_session_id, question_text, answer_text))
+    """, (tutor_session_id, display_text, answer_text))
     redemption = cur.fetchone()
-    prompt = f"{question_text} Send just the number."
-    save_tutor_message(cur, tutor_session_id, 'assistant', prompt, {'type': 'redemption_question', 'redemption_id': redemption['redemption_id']})
+    save_tutor_message(cur, tutor_session_id, 'assistant', display_text, {'type': 'redemption_question', 'redemption_id': redemption['redemption_id']})
     conn.commit()
     cur.close()
     conn.close()
-    return jsonify({'redemption_id': redemption['redemption_id'], 'question_text': question_text})
+    return jsonify({'redemption_id': redemption['redemption_id'], 'question_text': display_text})
 
 
 @app.route('/api/ai-tutor/redemption/answer', methods=['POST'])
@@ -1560,7 +1591,7 @@ def ai_tutor_redemption_answer():
         cur.close()
         conn.close()
         return jsonify({'error': 'Challenge not found.'}), 404
-    is_correct = student_answer.strip() == redemption['answer_text'].strip()
+    is_correct = student_answer.strip().lower() == redemption['answer_text'].strip().lower()
     awarded = 2 if is_correct else 0
     cur.execute("""
         UPDATE ai_tutor_redemptions
