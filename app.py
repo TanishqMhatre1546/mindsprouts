@@ -802,7 +802,7 @@ def admin_login():
 def logout():
     session.clear()
     flash('Logged out successfully.', 'success')
-    return redirect(url_for('landing'))
+    return redirect(url_for('index'))
 
 @app.route('/toggle_timer')
 @student_required
@@ -846,6 +846,14 @@ def topics(subject_id):
             WHERE student_id = %s AND subject_name = %s
         """, (session['student_id'], subject['subject_name']))
         attempted = [r['topic_name'] for r in cur.fetchall()]
+        cur.execute("""
+            SELECT t.topic_id, COUNT(q.question_id) AS question_count
+            FROM topics t
+            LEFT JOIN questions q ON q.topic_id = t.topic_id
+            WHERE t.topic_id = ANY(%s)
+            GROUP BY t.topic_id
+        """, ([t['topic_id'] for t in topics],))
+        question_counts = {row['topic_id']: row['question_count'] for row in cur.fetchall()}
     tutor_session_id = ensure_general_tutor_session(session['student_id'])
     return render_template(
         'topics.html',
@@ -853,7 +861,8 @@ def topics(subject_id):
         topics=topics,
         attempted=attempted,
         ai_tutor_locked=is_quiz_active(),
-        tutor_session_id=tutor_session_id
+        tutor_session_id=tutor_session_id,
+        question_counts=question_counts
     )
 
 @app.route('/quiz/<int:topic_id>')
@@ -1333,9 +1342,7 @@ def delete_topic(topic_id):
     cur.execute("SELECT COUNT(*) AS total FROM questions WHERE topic_id = %s", (topic_id,))
     question_count = cur.fetchone()['total']
     if question_count > 0:
-        cur.close(); conn.close()
-        flash('Cannot delete this topic because it still has questions.', 'danger')
-        return redirect(url_for('manage_topics'))
+        cur.execute("DELETE FROM questions WHERE topic_id = %s", (topic_id,))
     cur.execute("DELETE FROM topics WHERE topic_id = %s", (topic_id,))
     conn.commit()
     cur.close(); conn.close()

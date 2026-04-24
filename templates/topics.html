@@ -74,9 +74,9 @@
                         <span style="color:#16a34a">
                             <i class="fa-solid fa-check-circle"></i> Attempted
                         </span>
-                        · 10 questions · +10 pts each
+                        · {{ question_counts.get(topic.topic_id, 0) }} questions · +10 pts each
                     {% else %}
-                        10 questions · +10 pts each
+                        {{ question_counts.get(topic.topic_id, 0) }} questions · +10 pts each
                     {% endif %}
                 </div>
             </div>
