@@ -799,7 +799,7 @@ def admin_login():
 def logout():
     session.clear()
     flash('Logged out successfully.', 'success')
-    return redirect(url_for('index'))
+    return redirect(url_for('landing'))
 
 @app.route('/toggle_timer')
 @student_required

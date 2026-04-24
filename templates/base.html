@@ -20,50 +20,39 @@
             <i class="fa-solid fa-seedling"></i> MindSprouts
         </a>
 
-        <!-- Mobile badges -->
-        <div class="d-flex d-lg-none align-items-center gap-2 ms-auto me-2">
-            {% if session.student_id %}
-            <span class="points-badge-sm">
-                <i class="fa-solid fa-star"></i> {{ session.total_points }}
-            </span>
-            {% if session.current_streak > 0 %}
-            <span class="streak-badge-sm">
-                <i class="fa-solid fa-fire"></i> {{ session.current_streak }}
-            </span>
-            {% endif %}
-            {% endif %}
-        </div>
-
-        <button class="navbar-toggler" type="button"
+        <button class="navbar-toggler ms-auto" type="button"
                 data-bs-toggle="collapse" data-bs-target="#navMenu"
                 aria-controls="navMenu" aria-expanded="false">
             <span class="navbar-toggler-icon"></span>
         </button>
 
         <div class="collapse navbar-collapse" id="navMenu">
-            <!-- Mobile menu header (visible only on mobile) -->
-            <div class="mobile-nav-header d-lg-none">
+            <ul class="navbar-nav ms-lg-auto align-items-lg-center gap-1">
+                <!-- Mobile-only: name row at the very top of the dropdown -->
                 {% if session.student_id %}
-                <div class="mobile-nav-user">
-                    <div class="mobile-nav-avatar"><i class="fa-solid fa-user"></i></div>
-                    <div>
-                        <div class="mobile-nav-name">{{ session.student_name if session.student_name else 'Student' }}</div>
-                        <div class="mobile-nav-grade">Grade {{ session.grade }}</div>
+                <li class="nav-item d-lg-none mobile-nav-name-row">
+                    <div class="mobile-nav-identity">
+                        <div class="mobile-nav-avatar-sm"><i class="fa-solid fa-user"></i></div>
+                        <div>
+                            <div class="mobile-nav-name-text">{{ session.display_name }}</div>
+                            <div class="mobile-nav-grade-text">Grade {{ session.grade }} &nbsp;·&nbsp;
+                                <i class="fa-solid fa-star" style="color:#e85d4a"></i> {{ session.total_points }} pts
+                                {% if session.current_streak > 0 %}&nbsp;·&nbsp;<i class="fa-solid fa-fire" style="color:#ff8c42"></i> {{ session.current_streak }}d{% endif %}
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="mobile-nav-stats">
-                    <span class="points-badge" style="font-size:0.8rem;padding:4px 12px">
-                        <i class="fa-solid fa-star"></i> {{ session.total_points }} pts
-                    </span>
-                    {% if session.current_streak > 0 %}
-                    <span class="streak-badge" style="font-size:0.8rem;padding:4px 12px">
-                        <i class="fa-solid fa-fire"></i> {{ session.current_streak }}d
-                    </span>
-                    {% endif %}
-                </div>
+                </li>
+                {% elif session.admin_id %}
+                <li class="nav-item d-lg-none mobile-nav-name-row">
+                    <div class="mobile-nav-identity">
+                        <div class="mobile-nav-avatar-sm" style="background:linear-gradient(135deg,var(--violet),var(--violet-light))"><i class="fa-solid fa-shield-halved"></i></div>
+                        <div>
+                            <div class="mobile-nav-name-text">{{ session.display_name }}</div>
+                            <div class="mobile-nav-grade-text">{% if session.is_super_admin %}Super Admin{% else %}Admin{% endif %}</div>
+                        </div>
+                    </div>
+                </li>
                 {% endif %}
-            </div>
-            <ul class="navbar-nav ms-auto align-items-lg-center gap-1">
 
                 {% if session.student_id %}
                 <li class="nav-item">
