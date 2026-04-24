@@ -161,7 +161,7 @@ function openTopicEdit(topicId, topicName, subjectId, grade) {
     document.getElementById('editTopicName').value = topicName;
     document.getElementById('editTopicSubject').value = subjectId;
     document.getElementById('editTopicGrade').value = grade;
-    new bootstrap.Modal(document.getElementById('topicEditModal')).show();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('topicEditModal')).show();
 }
 </script>
 {% endblock %}

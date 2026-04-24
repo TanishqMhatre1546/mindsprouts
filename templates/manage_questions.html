@@ -322,7 +322,7 @@ function openEdit(id, topicId, question, a, b, c, d, correct) {
     document.getElementById('edit_c').value        = c;
     document.getElementById('edit_d').value        = d;
     document.getElementById('edit_correct').value  = correct;
-    new bootstrap.Modal(document.getElementById('editModal')).show();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('editModal')).show();
 }
 </script>
 {% endblock %}
