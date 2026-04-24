@@ -319,16 +319,19 @@ def build_tutor_analysis(score, total, subject_name, topic_name, review_rows):
     wrong_rows = [row for row in review_rows if not row['is_correct']]
     summary = f"You got {score} out of {total} correct. Great effort! Let's level up together."
     if not wrong_rows:
+        summary = f"Perfect score! You got {score} out of {total} correct. 🎉"
         pattern = f"Amazing! You are strong in {topic_name}."
         misconception = "No repeated mistakes found. Keep practicing to stay sharp!"
-    if True:
+    else:
         common_user = {}
         common_correct = {}
         for row in wrong_rows:
-            common_user[row['user']] = common_user.get(row['user'], 0) + 1
-            common_correct[row['correct']] = common_correct.get(row['correct'], 0) + 1
-        biggest_user = max(common_user.items(), key=lambda item: item[1])[0]
-        biggest_correct = max(common_correct.items(), key=lambda item: item[1])[0]
+            user_opt = (row.get('user') or '-').strip() or '-'
+            correct_opt = (row.get('correct') or '-').strip() or '-'
+            common_user[user_opt] = common_user.get(user_opt, 0) + 1
+            common_correct[correct_opt] = common_correct.get(correct_opt, 0) + 1
+        biggest_user = max(common_user.items(), key=lambda item: item[1])[0] if common_user else '-'
+        biggest_correct = max(common_correct.items(), key=lambda item: item[1])[0] if common_correct else '-'
         pattern = f"You seem to need more practice in {topic_name}, especially when answer choices look similar."
         misconception = (
             f"I noticed a pattern: option {biggest_user} was often picked when option {biggest_correct} was correct. "
@@ -834,17 +837,15 @@ def student_dashboard():
 @app.route('/topics/<int:subject_id>')
 @student_required
 def topics(subject_id):
-    conn = get_db()
-    cur  = conn.cursor()
-    cur.execute("SELECT * FROM subjects WHERE subject_id = %s", (subject_id,))
-    subject = cur.fetchone()
-    topics = fetch_topics_for_subject_with_grade_fallback(cur, subject_id, session['grade'])
-    cur.execute("""
-        SELECT DISTINCT topic_name FROM results
-        WHERE student_id = %s AND subject_name = %s
-    """, (session['student_id'], subject['subject_name']))
-    attempted = [r['topic_name'] for r in cur.fetchall()]
-    cur.close(); conn.close()
+    with db_cursor() as (conn, cur):
+        cur.execute("SELECT * FROM subjects WHERE subject_id = %s", (subject_id,))
+        subject = cur.fetchone()
+        topics = fetch_topics_for_subject_with_grade_fallback(cur, subject_id, session['grade'])
+        cur.execute("""
+            SELECT DISTINCT topic_name FROM results
+            WHERE student_id = %s AND subject_name = %s
+        """, (session['student_id'], subject['subject_name']))
+        attempted = [r['topic_name'] for r in cur.fetchall()]
     tutor_session_id = ensure_general_tutor_session(session['student_id'])
     return render_template(
         'topics.html',
@@ -858,26 +859,24 @@ def topics(subject_id):
 @app.route('/quiz/<int:topic_id>')
 @student_required
 def quiz(topic_id):
-    conn = get_db()
-    cur  = conn.cursor()
-    cur.execute("SELECT * FROM topics WHERE topic_id = %s", (topic_id,))
-    topic = cur.fetchone()
-    cur.execute("SELECT * FROM questions WHERE topic_id = %s", (topic_id,))
-    all_questions = cur.fetchall()
-    questions = random.sample(all_questions, min(10, len(all_questions)))
-    session['quiz_questions']    = [q['question_id'] for q in questions]
-    session['quiz_topic_id']     = topic_id
-    session['quiz_topic_name']   = topic['topic_name']
-    session['quiz_attempt_token'] = str(uuid.uuid4())
-    session['quiz_submitted'] = False
-    cur.execute("""
-        SELECT s.subject_name FROM subjects s
-        JOIN topics t ON s.subject_id = t.subject_id
-        WHERE t.topic_id = %s
-    """, (topic_id,))
-    subj = cur.fetchone()
-    quiz_duration_minutes = get_quiz_duration_minutes(conn)
-    cur.close(); conn.close()
+    with db_cursor() as (conn, cur):
+        cur.execute("SELECT * FROM topics WHERE topic_id = %s", (topic_id,))
+        topic = cur.fetchone()
+        cur.execute("SELECT * FROM questions WHERE topic_id = %s", (topic_id,))
+        all_questions = cur.fetchall()
+        questions = random.sample(all_questions, min(10, len(all_questions)))
+        session['quiz_questions']    = [q['question_id'] for q in questions]
+        session['quiz_topic_id']     = topic_id
+        session['quiz_topic_name']   = topic['topic_name']
+        session['quiz_attempt_token'] = str(uuid.uuid4())
+        session['quiz_submitted'] = False
+        cur.execute("""
+            SELECT s.subject_name FROM subjects s
+            JOIN topics t ON s.subject_id = t.subject_id
+            WHERE t.topic_id = %s
+        """, (topic_id,))
+        subj = cur.fetchone()
+        quiz_duration_minutes = get_quiz_duration_minutes(conn)
     session['quiz_subject_name'] = subj['subject_name']
     initialize_quiz_timer(quiz_duration_minutes)
     return render_template(
@@ -976,7 +975,7 @@ def submit_quiz():
         pass
     elif (today - last_date).days == 1:
         current_streak += 1
-    else:
+
         current_streak = 1
     if current_streak > longest_streak:
         longest_streak = current_streak
@@ -1162,27 +1161,22 @@ def change_password():
     current_pw = request.form['current_password']
     new_pw     = request.form['new_password']
     confirm_pw = request.form['confirm_password']
-    conn = get_db()
-    cur  = conn.cursor()
-    cur.execute("SELECT password_hash FROM students WHERE student_id = %s", (session['student_id'],))
-    row = cur.fetchone() or {}
-    ok, _ = verify_password_and_maybe_upgrade(row.get('password_hash'), current_pw)
-    if not ok:
-        flash('Current password is incorrect!', 'danger')
-        cur.close(); conn.close()
-        return redirect(url_for('profile'))
-    if new_pw != confirm_pw:
-        flash('New passwords do not match!', 'danger')
-        cur.close(); conn.close()
-        return redirect(url_for('profile'))
-    if len(new_pw) < 4:
-        flash('Password must be at least 4 characters!', 'danger')
-        cur.close(); conn.close()
-        return redirect(url_for('profile'))
-    else:
+    with db_cursor(commit=True) as (conn, cur):
+        cur.execute("SELECT password_hash FROM students WHERE student_id = %s", (session['student_id'],))
+        row = cur.fetchone() or {}
+        ok, _ = verify_password_and_maybe_upgrade(row.get('password_hash'), current_pw)
+        if not ok:
+            flash('Current password is incorrect!', 'danger')
+            return redirect(url_for('profile'))
+        if new_pw != confirm_pw:
+            flash('New passwords do not match!', 'danger')
+            return redirect(url_for('profile'))
+        if len(new_pw) < 4:
+            flash('Password must be at least 4 characters!', 'danger')
+            return redirect(url_for('profile'))
+        # Update password
         cur.execute("UPDATE students SET password_hash = %s WHERE student_id = %s",
                     (hash_password(new_pw), session['student_id']))
-        conn.commit()
         flash('Password changed successfully!', 'success')
     cur.close(); conn.close()
     return redirect(url_for('profile'))
@@ -1652,7 +1646,7 @@ def ai_tutor_redemption_new():
     conn = get_db()
     cur = conn.cursor()
     cur.execute("""
-        SELECT topic_name
+        SELECT topic_name, subject_name
         FROM ai_tutor_sessions
         WHERE tutor_session_id = %s AND student_id = %s
     """, (tutor_session_id, session['student_id']))

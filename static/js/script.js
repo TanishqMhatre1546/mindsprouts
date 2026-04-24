@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const localTimerKey = quizToken ? `mindsprouts_quiz_started_at_${quizToken}` : null;
 
     if (questions.length > 0) showQuestion(0);
+    if (timerEnabled) startTimer();
 
     function showQuestion(index) {
         questions.forEach((q, i) => {
@@ -26,7 +27,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const counter = document.getElementById('q-counter');
         if (counter) counter.textContent = `Question ${index + 1} of ${totalQ}`;
         syncQuestionState(questions[index], index);
-        if (timerEnabled) startTimer();
     }
 
     function updateProgress(cur, total) {
@@ -88,7 +88,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function moveNext() {
         if (isSubmitting) return;
-        clearInterval(timerInterval);
         current++;
         if (current < totalQ) {
             showQuestion(current);
@@ -100,7 +99,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function movePrev() {
         if (isSubmitting) return;
-        clearInterval(timerInterval);
         if (current > 0) {
             current--;
             showQuestion(current);
