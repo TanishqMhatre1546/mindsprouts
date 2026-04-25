@@ -322,7 +322,15 @@ function openEdit(id, topicId, question, a, b, c, d, correct) {
     document.getElementById('edit_c').value        = c;
     document.getElementById('edit_d').value        = d;
     document.getElementById('edit_correct').value  = correct;
-    bootstrap.Modal.getOrCreateInstance(document.getElementById('editModal')).show();
+    const modalEl = document.getElementById('editModal');
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    // Rebind mic buttons inside modal after it opens (they are hidden on DOMContentLoaded)
+    modalEl.addEventListener('shown.bs.modal', function onShown() {
+        if (window.MindSproutsVoice) {
+            window.MindSproutsVoice.bindMicButtons(modalEl);
+        }
+        modalEl.removeEventListener('shown.bs.modal', onShown);
+    });
 }
 </script>
 {% endblock %}
