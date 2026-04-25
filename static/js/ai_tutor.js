@@ -1,4 +1,9 @@
 (() => {
+    const tutorSessionId   = window.tutorSessionId   || '';
+    const tutorTopicName   = window.tutorTopicName   || 'General Studies';
+    const tutorSubjectName = window.tutorSubjectName || 'General';
+    const presetQuestionId = window.presetQuestionId || null;
+
     const chatBox = document.getElementById('tutor-chat-messages');
     const chatForm = document.getElementById('tutor-chat-form');
     const chatInput = document.getElementById('tutor-chat-input');
@@ -27,10 +32,20 @@
         });
     }
 
+    function renderMessageText(text) {
+        const escaped = String(text || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        return escaped
+            .replace(/\n/g, '<br>')
+            .replace(/(^|<br>)\- (.+?)(?=<br>|$)/g, '$1• $2');
+    }
+
     function addMessage(role, text) {
         const el = document.createElement('div');
         el.className = `tutor-msg ${role}`;
-        el.textContent = text;
+        el.innerHTML = renderMessageText(text);
         chatBox.appendChild(el);
         chatBox.scrollTop = chatBox.scrollHeight;
         const mappedRole = role === 'assistant' ? 'model' : 'user';
@@ -76,6 +91,12 @@
         e.preventDefault();
         const message = chatInput.value.trim();
         if (!message) return;
+        const submitBtn = chatForm.querySelector('button[type="submit"]');
+        chatInput.disabled = true;
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        }
         addMessage('user', message);
         chatInput.value = '';
         try {
@@ -83,12 +104,22 @@
             addMessage('assistant', reply);
         } catch (err) {
             addMessage('assistant', `Oops, I could not answer right now. ${err.message}`);
+        } finally {
+            chatInput.disabled = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i>';
+            }
+            chatInput.focus();
         }
     });
 
     explainButtons.forEach((btn) => {
         btn.addEventListener('click', async () => {
             const questionId = btn.dataset.questionId;
+            btn.disabled = true;
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Explaining...';
             try {
                 const data = await postJson('/api/ai-tutor/explain', {
                     tutor_session_id: tutorSessionId,
@@ -97,6 +128,9 @@
                 addMessage('assistant', data.message);
             } catch (err) {
                 addMessage('assistant', `I could not explain that question now. ${err.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
             }
         });
     });

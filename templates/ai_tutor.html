@@ -77,10 +77,10 @@
 
 {% block extra_js %}
 <script>
-const tutorSessionId = "{{ tutor_session.tutor_session_id }}";
-const presetQuestionId = "{{ request.args.get('question_id', '') }}";
-const tutorTopicName = {{ tutor_session.topic_name|tojson }};
-const tutorSubjectName = {{ tutor_session.subject_name|tojson }};
+  window.tutorSessionId   = "{{ tutor_session.tutor_session_id }}";
+  window.tutorTopicName   = {{ tutor_session.topic_name | tojson }};
+  window.tutorSubjectName = {{ tutor_session.subject_name | tojson }};
+  window.presetQuestionId = {{ request.args.get('question_id') | tojson if request.args.get('question_id') else 'null' }};
 </script>
 <script src="{{ url_for('static', filename='js/ai_tutor.js') }}"></script>
 {% endblock %}

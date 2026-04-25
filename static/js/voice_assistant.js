@@ -11,13 +11,24 @@
   }
 
   function toast(message) {
-    // lightweight fallback: don't assume Bootstrap Toast is present/initialized
-    try {
-      // eslint-disable-next-line no-alert
-      alert(message);
-    } catch {
-      // ignore
-    }
+    const container =
+      document.getElementById('voice-toast-container') ||
+      (() => {
+        const el = document.createElement('div');
+        el.id = 'voice-toast-container';
+        el.style.cssText =
+          'position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);z-index:9999';
+        document.body.appendChild(el);
+        return el;
+      })();
+    const toastEl = document.createElement('div');
+    toastEl.className = 'toast align-items-center text-bg-warning border-0 show';
+    toastEl.setAttribute('role', 'status');
+    toastEl.innerHTML = `<div class="d-flex"><div class="toast-body">${String(
+      message || ''
+    )}</div></div>`;
+    container.appendChild(toastEl);
+    setTimeout(() => toastEl.remove(), 3500);
   }
 
   function setBtnState(btn, state) {

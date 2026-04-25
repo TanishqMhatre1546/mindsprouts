@@ -116,7 +116,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const nextBtn = block.querySelector('.next-btn');
         if (nextBtn) nextBtn.disabled = !selected;
         const prevBtn = block.querySelector('.prev-btn');
-        if (prevBtn) prevBtn.disabled = (index === 0);
+        if (prevBtn) {
+            prevBtn.disabled = (index === 0);
+            prevBtn.style.visibility = index === 0 ? 'hidden' : 'visible';
+        }
     }
 
     // Option selection
